@@ -6,5 +6,6 @@ class ApiConfig(AppConfig):
 
     def ready(self):
         import api.signals
-        from api.mongo import get_mongo_db
+        from api.mongo import get_mongo_db, restore_from_mongo
         get_mongo_db()
+        restore_from_mongo()

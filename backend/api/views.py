@@ -52,7 +52,11 @@ def register_student(request):
     if not email or not password:
         return Response({'error': 'Email and password are required'}, status=status.HTTP_400_BAD_REQUEST)
 
-    if User.objects.filter(username=email).exists():
+    # Restore from mongo first to check existing accounts
+    from api.mongo import get_mongo_db, restore_from_mongo, sync_to_mongo
+    restore_from_mongo()
+
+    if User.objects.filter(username=email).exists() or User.objects.filter(email=email).exists():
         return Response({'error': 'A user with this email already exists'}, status=status.HTTP_400_BAD_REQUEST)
 
     user = User.objects.create_user(
@@ -66,7 +70,20 @@ def register_student(request):
         role='student'
     )
     
-    # Students are NOT automatically enrolled in a batch (Admin must allocate them)
+    # Sync immediately to MongoDB Atlas
+    user_data = {
+        'id': user.id,
+        'username': user.username,
+        'email': user.email,
+        'password': user.password,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'roll_number': user.roll_number,
+        'phone_number': user.phone_number,
+        'role': user.role
+    }
+    sync_to_mongo('users', user.id, user_data)
+
     token = generate_token(user)
     return Response({
         'token': token,
@@ -83,7 +100,16 @@ def login_student(request):
     if not email or not password:
         return Response({'error': 'Email and password are required'}, status=status.HTTP_400_BAD_REQUEST)
 
+    from api.mongo import restore_from_mongo
+    restore_from_mongo()
+
     user = authenticate(username=email, password=password)
+    if not user:
+        # Check by email in case username differs
+        existing = User.objects.filter(email=email).first()
+        if existing and existing.check_password(password):
+            user = existing
+
     if not user:
         return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -92,6 +118,7 @@ def login_student(request):
         'token': token,
         'user': UserSerializer(user).data
     }, status=status.HTTP_200_OK)
+
 
 
 @api_view(['GET', 'PUT'])
