@@ -88,19 +88,23 @@ export default function Login({ setAuth, API_URL }) {
 
   return (
     <div style={styles.container}>
-      {/* Decorative animated cosmic background */}
-      <div className="cosmic-bg" style={{
-        background: 'linear-gradient(rgba(11, 15, 25, 0.55), rgba(11, 15, 25, 0.8)), url("/mits_campus.jpg")',
+      {/* Decorative background with natural, clear image */}
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 0,
+        pointerEvents: 'none',
+        overflow: 'hidden',
+        background: 'linear-gradient(rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.3)), url("/mits_campus.jpg")',
         backgroundSize: 'cover',
         backgroundPosition: 'center'
       }}>
-        <div className="aurora-wave"></div>
-
-        <div className="blob blob-1"></div>
-        <div className="blob blob-2"></div>
-        <div className="blob blob-3"></div>
-        <div className="blob blob-4"></div>
       </div>
+
+
 
       {/* Left Portion: Branding Header and Bottom Caption Info */}
       <div style={styles.leftPanel}>
