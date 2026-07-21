@@ -124,8 +124,9 @@ export default function Login({ setAuth, API_URL }) {
       </div>
 
       {/* Right Portion: Centered Login details on a semi-transparent panel */}
-      <div style={styles.rightPanel} className="glass-panel-glow">
+      <div style={styles.rightPanel}>
         <div style={styles.formCard}>
+
           <div style={{ marginBottom: 28 }}>
             <h2 style={styles.formHeader}>{isRegister ? 'Create an Account' : 'Welcome back'}</h2>
             <p style={styles.formSubheader}>
