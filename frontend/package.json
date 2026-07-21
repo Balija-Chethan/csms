@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "start": "serve -s dist -l $PORT",
     "lint": "oxlint",
     "preview": "vite preview"
   },
@@ -14,7 +15,8 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "vite": "^8.1.1",
-    "@vitejs/plugin-react": "^6.0.3"
+    "@vitejs/plugin-react": "^6.0.3",
+    "serve": "^14.2.1"
   },
   "devDependencies": {
     "@types/react": "^19.2.17",
