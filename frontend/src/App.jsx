@@ -122,11 +122,13 @@ export default function App() {
 
   return (
     <div className="theme-default" style={styles.appContainer}>
-      {/* Decorative animated cosmic background blobs */}
+      {/* Decorative animated cosmic background blobs & visual effects */}
       <div className="cosmic-bg">
+        <div className="aurora-wave"></div>
         <div className="blob blob-1"></div>
         <div className="blob blob-2"></div>
         <div className="blob blob-3"></div>
+        <div className="blob blob-4"></div>
       </div>
       {/* Top Header */}
       <header style={styles.header}>

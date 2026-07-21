@@ -67,6 +67,15 @@ export default function Login({ setAuth, API_URL }) {
 
   return (
     <div style={styles.container}>
+      {/* Decorative animated cosmic background */}
+      <div className="cosmic-bg">
+        <div className="aurora-wave"></div>
+        <div className="blob blob-1"></div>
+        <div className="blob blob-2"></div>
+        <div className="blob blob-3"></div>
+        <div className="blob blob-4"></div>
+      </div>
+
       {/* Left Portion: Branding Header and Bottom Caption Info */}
       <div style={styles.leftPanel}>
         <div style={styles.topBranding}>
@@ -89,7 +98,7 @@ export default function Login({ setAuth, API_URL }) {
       </div>
 
       {/* Right Portion: Centered Login details on a semi-transparent panel */}
-      <div style={styles.rightPanel}>
+      <div style={styles.rightPanel} className="glass-panel-glow">
         <div style={styles.formCard}>
           <div style={{ marginBottom: 28 }}>
             <h2 style={styles.formHeader}>{isRegister ? 'Create an Account' : 'Welcome back'}</h2>
@@ -229,11 +238,12 @@ const styles = {
     display: 'flex',
     minHeight: '100vh',
     width: '100vw',
-    backgroundImage: 'linear-gradient(rgba(15, 23, 42, 0.3), rgba(15, 23, 42, 0.45)), url("/mits_campus.jpg")',
+    backgroundImage: 'linear-gradient(rgba(15, 23, 42, 0.4), rgba(15, 23, 42, 0.65)), url("/mits_campus.jpg")',
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     overflow: 'hidden',
     boxSizing: 'border-box',
+    position: 'relative',
   },
   leftPanel: {
     flex: 1.2,
@@ -242,6 +252,8 @@ const styles = {
     justifyContent: 'space-between',
     padding: '60px 48px',
     boxSizing: 'border-box',
+    position: 'relative',
+    zIndex: 2,
     '@media (max-width: 900px)': {
       display: 'none',
     }
@@ -298,15 +310,21 @@ const styles = {
   },
   rightPanel: {
     flex: 0.8,
-    background: 'rgba(15, 23, 42, 0.4)',
+    background: 'rgba(15, 23, 42, 0.6)',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
+    borderLeft: '1px solid rgba(255, 255, 255, 0.12)',
+    boxShadow: '-10px 0 30px rgba(0, 0, 0, 0.5)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     padding: '48px 40px',
     boxSizing: 'border-box',
+    position: 'relative',
+    zIndex: 2,
     '@media (max-width: 900px)': {
       flex: 1,
-      background: 'rgba(15, 23, 42, 0.7)',
+      background: 'rgba(15, 23, 42, 0.85)',
     }
   },
   formCard: {
