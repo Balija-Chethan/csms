@@ -359,7 +359,18 @@ def student_tasks(request):
 def student_leetcode(request):
     user = request.user
     update_user_last_seen(user)
-    today = timezone.now().date()
+    
+    # Calculate active challenge date based on Asia/Kolkata (IST) 9 AM boundary (9 AM to 9 AM next day)
+    try:
+        from zoneinfo import ZoneInfo
+        local_now = timezone.now().astimezone(ZoneInfo('Asia/Kolkata'))
+    except Exception:
+        # Fallback to manual IST offset (+5.5 hours) if ZoneInfo is not supported
+        local_now = timezone.now() + timedelta(hours=5.5)
+        
+    active_time = local_now - timedelta(hours=9)
+    active_date = active_time.date()
+
     
     if request.method == 'GET':
         challenges = LeetcodeChallenge.objects.all().order_by('available_date', 'day_number')
@@ -371,29 +382,76 @@ def student_leetcode(request):
             for sub in LeetcodeSubmission.objects.filter(student=user, challenge_id__in=challenge_ids)
         }
         
+        # Calculate streak dynamically
+        # Retrieve all challenges released up to the current active_date
+        past_challenges = [ch for ch in challenges if ch.available_date <= active_date]
+        past_challenges.reverse()  # Go backwards in time
+        
+        streak = 0
+        for ch in past_challenges:
+            sub = submissions_dict.get(ch.id)
+            has_solved = sub and sub.status == 'completed'
+            
+            if ch.available_date == active_date:
+                # If active challenge is solved, increment streak
+                # If not solved yet, do not break the streak since the day's window is still open
+                if has_solved:
+                    streak += 1
+            else:
+                # If past challenge was solved, increment streak
+                if has_solved:
+                    streak += 1
+                else:
+                    # Missed past challenge = Streak is broken!
+                    break
+        
         serialized = []
         solved_count = 0
         for ch in challenges:
-            is_unlocked = ch.available_date <= today
             sub = submissions_dict.get(ch.id)
-            if sub and sub.status == 'completed':
-                solved_count += 1
+            has_solved = sub and sub.status == 'completed'
             
-            serialized.append({
-                'id': ch.id,
-                'title': ch.title,
-                'url': ch.url if is_unlocked else None, # Redact link if future locked day
-                'available_date': ch.available_date,
-                'day_number': ch.day_number,
-                'deadline': ch.deadline,
-                'is_unlocked': is_unlocked,
-                'is_today': ch.available_date == today,
-                'submission': LeetcodeSubmissionSerializer(sub).data if sub else None
-            })
+            # Visibility: 
+            # 1. Today's active challenge is visible.
+            # 2. Older challenges are ONLY visible if they were successfully solved.
+            # 3. Future challenges are locked and hidden.
+            is_active = ch.available_date == active_date
+            is_past = ch.available_date < active_date
+            
+            if is_active:
+                is_unlocked = True
+                visible = True
+            elif is_past:
+                is_unlocked = True
+                visible = has_solved  # Hidden if missed/unsolved
+            else:
+                is_unlocked = False
+                visible = False
+            
+            if visible:
+                if has_solved:
+                    solved_count += 1
+                
+                # Deadline is 9:00 AM of the day after available_date
+                deadline_dt = timezone.make_aware(
+                    datetime.combine(ch.available_date + timedelta(days=1), datetime.min.time().replace(hour=9))
+                )
+                
+                serialized.append({
+                    'id': ch.id,
+                    'title': ch.title,
+                    'url': ch.url,
+                    'available_date': ch.available_date,
+                    'day_number': ch.day_number,
+                    'deadline': deadline_dt,
+                    'is_unlocked': is_unlocked,
+                    'is_today': is_active,
+                    'submission': LeetcodeSubmissionSerializer(sub).data if sub else None
+                })
         
         return Response({
             'challenges': serialized,
-            'streak': min(solved_count * 2, 30) if solved_count > 0 else 0,
+            'streak': streak,
             'solved': solved_count,
             'onlineStudents': get_online_student_count()
         })
@@ -410,8 +468,19 @@ def student_leetcode(request):
         except LeetcodeChallenge.DoesNotExist:
             return Response({'error': 'Challenge not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        if ch.available_date > today:
-            return Response({'error': 'This challenge is locked and will open on its scheduled day.'}, status=status.HTTP_403_FORBIDDEN)
+        # Enforce active submission window: must be the current active challenge
+        try:
+            from zoneinfo import ZoneInfo
+            local_now = timezone.now().astimezone(ZoneInfo('Asia/Kolkata'))
+        except Exception:
+            local_now = timezone.now() + timedelta(hours=5.5)
+
+        active_time = local_now - timedelta(hours=9)
+        active_date = active_time.date()
+
+        if ch.available_date != active_date:
+            return Response({'error': 'This challenge window is closed. You can only submit today\'s active challenge.'}, status=status.HTTP_403_FORBIDDEN)
+
 
         sub, created = LeetcodeSubmission.objects.get_or_create(challenge=ch, student=user, defaults={'submission_url': submission_url})
         if not created:
@@ -419,6 +488,7 @@ def student_leetcode(request):
             sub.save()
 
         return Response(LeetcodeSubmissionSerializer(sub).data)
+
 
 
 @api_view(['GET', 'POST'])
