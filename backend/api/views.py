@@ -1423,6 +1423,9 @@ def get_batches(request):
 @permission_classes([IsAuthenticated])
 def request_batch_join(request):
     """Student submits request to join a batch."""
+    from api.mongo import restore_from_mongo
+    restore_from_mongo()
+
     student = request.user
     if student.role != 'student':
         return Response({'error': 'Only students can request batch enrollment'}, status=status.HTTP_403_FORBIDDEN)
@@ -1465,6 +1468,9 @@ def request_batch_join(request):
 @permission_classes([IsAuthenticated])
 def get_student_enrollment(request):
     """Get the current student's enrollment status."""
+    from api.mongo import restore_from_mongo
+    restore_from_mongo()
+
     student = request.user
     enrollment = BatchEnrollment.objects.filter(student=student).order_by('-joined_at').first()
 
@@ -1506,6 +1512,9 @@ def admin_approve_batch_request(request, enrollment_id):
     if request.user.role != 'admin':
         return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
 
+    from api.mongo import restore_from_mongo
+    restore_from_mongo()
+
     enrollment = BatchEnrollment.objects.filter(id=enrollment_id).first()
     if not enrollment:
         return Response({'error': 'Enrollment request not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -1528,6 +1537,9 @@ def admin_reject_batch_request(request, enrollment_id):
     """Admin endpoint: Reject student batch request."""
     if request.user.role != 'admin':
         return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
+
+    from api.mongo import restore_from_mongo
+    restore_from_mongo()
 
     enrollment = BatchEnrollment.objects.filter(id=enrollment_id).first()
     if not enrollment:
