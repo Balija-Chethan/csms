@@ -1,9 +1,35 @@
 import os
 import pymongo
+import time
 from django.conf import settings
 
 _mongo_client = None
 _mongo_db = None
+_last_restore_time = 0
+RESTORE_THROTTLE_SECONDS = 15
+
+def create_mongo_indexes(db):
+    try:
+        db['users'].create_index([('email', 1)], unique=True, sparse=True)
+        db['users'].create_index([('username', 1)], unique=True)
+        db['users'].create_index([('role', 1)])
+        db['batch_enrollments'].create_index([('student_id', 1)])
+        db['batch_enrollments'].create_index([('batch_id', 1)])
+        db['batch_enrollments'].create_index([('status', 1)])
+        db['tasks'].create_index([('batch_id', 1)])
+        db['tasks'].create_index([('due_date', 1)])
+        db['submissions'].create_index([('student_id', 1)])
+        db['submissions'].create_index([('task_id', 1)])
+        db['leetcode_submissions'].create_index([('student_id', 1)])
+        db['leetcode_submissions'].create_index([('challenge_id', 1)])
+        db['attendance_logs'].create_index([('student_id', 1)])
+        db['attendance_logs'].create_index([('date', 1)])
+        db['leave_requests'].create_index([('student_id', 1)])
+        db['chat_messages'].create_index([('batch_id', 1)])
+        db['chat_messages'].create_index([('timestamp', 1)])
+        print("[MongoDB] Indexes verified/created successfully.")
+    except Exception as e:
+        print(f"[MongoDB Error] Failed to create indexes: {e}")
 
 def get_mongo_db():
     global _mongo_client, _mongo_db
@@ -16,6 +42,7 @@ def get_mongo_db():
             _mongo_client = pymongo.MongoClient(uri, serverSelectionTimeoutMS=5000)
             _mongo_db = _mongo_client.get_database('csms_db')
             print("[MongoDB] Successfully connected to MongoDB Atlas (csms_db)")
+            create_mongo_indexes(_mongo_db)
         except Exception as e:
             print(f"[MongoDB Error] Connection to MongoDB Atlas failed: {e}")
             return None
@@ -57,8 +84,14 @@ def get_all_from_mongo(collection_name):
         return []
 
 
-def restore_from_mongo():
+def restore_from_mongo(force=False):
     """Restore all data from MongoDB Atlas into active Django ORM models on startup/login."""
+    global _last_restore_time
+    now = time.time()
+    if not force and (now - _last_restore_time) < RESTORE_THROTTLE_SECONDS:
+        return
+    _last_restore_time = now
+
     db = get_mongo_db()
     if db is None:
         return

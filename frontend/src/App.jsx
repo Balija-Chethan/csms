@@ -1,38 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { 
   LayoutDashboard, BookOpen, BarChart3, Users, 
   Settings, LogOut, ChevronDown, ChevronRight, ClipboardList, Clock, ShieldAlert, Award
 } from 'lucide-react';
-import Login from './components/Login';
-import Dashboard from './components/Dashboard';
-import Tasks from './components/Tasks';
-import LeetCode from './components/LeetCode';
-import Notes from './components/Notes';
-import Grades from './components/Grades';
-import Leaderboard from './components/Leaderboard';
-import Attendance from './components/Attendance';
-import Leaves from './components/Leaves';
-import Chat from './components/Chat';
-import Profile from './components/Profile';
-import PlacementPrep from './components/PlacementPrep';
+
+const Login = lazy(() => import('./components/Login'));
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const Tasks = lazy(() => import('./components/Tasks'));
+const LeetCode = lazy(() => import('./components/LeetCode'));
+const Notes = lazy(() => import('./components/Notes'));
+const Grades = lazy(() => import('./components/Grades'));
+const Leaderboard = lazy(() => import('./components/Leaderboard'));
+const Attendance = lazy(() => import('./components/Attendance'));
+const Leaves = lazy(() => import('./components/Leaves'));
+const Chat = lazy(() => import('./components/Chat'));
+const Profile = lazy(() => import('./components/Profile'));
+const PlacementPrep = lazy(() => import('./components/PlacementPrep'));
 
 // Admin components
-import AdminDashboard from './components/AdminDashboard';
-import AdminAllocation from './components/AdminAllocation';
-import AdminTasks from './components/AdminTasks';
-import AdminGrades from './components/AdminGrades';
-import AdminLeaves from './components/AdminLeaves';
-import AdminAttendance from './components/AdminAttendance';
-import AdminNotes from './components/AdminNotes';
-import AdminMockResults from './components/AdminMockResults';
-import AdminPlacementPrep from './components/AdminPlacementPrep';
-import AdminUsers from './components/AdminUsers';
+const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
+const AdminAllocation = lazy(() => import('./components/AdminAllocation'));
+const AdminTasks = lazy(() => import('./components/AdminTasks'));
+const AdminGrades = lazy(() => import('./components/AdminGrades'));
+const AdminLeaves = lazy(() => import('./components/AdminLeaves'));
+const AdminAttendance = lazy(() => import('./components/AdminAttendance'));
+const AdminNotes = lazy(() => import('./components/AdminNotes'));
+const AdminMockResults = lazy(() => import('./components/AdminMockResults'));
+const AdminPlacementPrep = lazy(() => import('./components/AdminPlacementPrep'));
+const AdminUsers = lazy(() => import('./components/AdminUsers'));
 
 // Student Onboarding components
-import BatchSelection from './components/BatchSelection';
-import PendingApproval from './components/PendingApproval';
-import RejectedBatch from './components/RejectedBatch';
-import AdminPendingRequests from './components/AdminPendingRequests';
+const BatchSelection = lazy(() => import('./components/BatchSelection'));
+const PendingApproval = lazy(() => import('./components/PendingApproval'));
+const RejectedBatch = lazy(() => import('./components/RejectedBatch'));
+const AdminPendingRequests = lazy(() => import('./components/AdminPendingRequests'));
 
 const API_URL = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? "http://127.0.0.1:8000/api" : "/api");
 
@@ -158,7 +159,15 @@ export default function App() {
   };
 
   if (!token) {
-    return <Login setAuth={setAuth} API_URL={API_URL} />;
+    return (
+      <Suspense fallback={
+        <div style={{ display: 'flex', height: '100vh', width: '100vw', alignItems: 'center', justifyContent: 'center', background: '#0b0f19', color: '#fff' }}>
+          <h2>Loading Portal...</h2>
+        </div>
+      }>
+        <Login setAuth={setAuth} API_URL={API_URL} />
+      </Suspense>
+    );
   }
 
   if (loading && !dashboardData) {
@@ -469,79 +478,86 @@ export default function App() {
         {/* Content Pane */}
         <main style={styles.contentPane}>
           <div key={activeTab} className="animate-fade-in" style={{ minHeight: '100%' }}>
-            {isAdmin ? (
-              // ADMIN CONTENT ROUTING
-              <>
-                {activeTab === 'admin_dashboard' && <AdminDashboard API_URL={API_URL} token={token} />}
-                {activeTab === 'admin_pending_requests' && <AdminPendingRequests API_URL={API_URL} token={token} />}
-                {activeTab === 'admin_allocation' && <AdminAllocation API_URL={API_URL} token={token} />}
-                {activeTab === 'admin_users' && <AdminUsers API_URL={API_URL} token={token} />}
-                {activeTab === 'admin_tasks' && <AdminTasks API_URL={API_URL} token={token} />}
-                {activeTab === 'admin_grades' && <AdminGrades API_URL={API_URL} token={token} />}
-                {activeTab === 'admin_mock_results' && <AdminMockResults API_URL={API_URL} token={token} />}
-                {activeTab === 'admin_notes' && <AdminNotes API_URL={API_URL} token={token} />}
-                {activeTab === 'admin_placement_prep' && <AdminPlacementPrep API_URL={API_URL} token={token} />}
-                {activeTab === 'admin_leaves' && <AdminLeaves API_URL={API_URL} token={token} />}
-                {activeTab === 'admin_attendance' && <AdminAttendance API_URL={API_URL} token={token} />}
-              </>
+            <Suspense fallback={
+              <div style={{ display: 'flex', height: '100%', minHeight: '300px', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', gap: 12 }}>
+                <div style={{ width: 24, height: 24, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.1)', borderTopColor: '#3b82f6', animation: 'spin 1s linear infinite' }}></div>
+                <span>Loading view...</span>
+              </div>
+            }>
+              {isAdmin ? (
+                // ADMIN CONTENT ROUTING
+                <>
+                  {activeTab === 'admin_dashboard' && <AdminDashboard API_URL={API_URL} token={token} />}
+                  {activeTab === 'admin_pending_requests' && <AdminPendingRequests API_URL={API_URL} token={token} />}
+                  {activeTab === 'admin_allocation' && <AdminAllocation API_URL={API_URL} token={token} />}
+                  {activeTab === 'admin_users' && <AdminUsers API_URL={API_URL} token={token} />}
+                  {activeTab === 'admin_tasks' && <AdminTasks API_URL={API_URL} token={token} />}
+                  {activeTab === 'admin_grades' && <AdminGrades API_URL={API_URL} token={token} />}
+                  {activeTab === 'admin_mock_results' && <AdminMockResults API_URL={API_URL} token={token} />}
+                  {activeTab === 'admin_notes' && <AdminNotes API_URL={API_URL} token={token} />}
+                  {activeTab === 'admin_placement_prep' && <AdminPlacementPrep API_URL={API_URL} token={token} />}
+                  {activeTab === 'admin_leaves' && <AdminLeaves API_URL={API_URL} token={token} />}
+                  {activeTab === 'admin_attendance' && <AdminAttendance API_URL={API_URL} token={token} />}
+                </>
 
-            ) : (
-              // STUDENT CONTENT ROUTING
-              <>
-                {enrollmentStatus === 'no_enrollment' ? (
-                  <BatchSelection 
-                    API_URL={API_URL} 
-                    token={token} 
-                    onEnrollmentRequested={() => {
-                      fetchEnrollmentStatus();
-                      fetchDashboardData();
-                    }} 
-                  />
-                ) : enrollmentStatus === 'pending' ? (
-                  <PendingApproval 
-                    enrollment={enrollmentData} 
-                    onRefresh={() => {
-                      fetchEnrollmentStatus();
-                      fetchDashboardData();
-                    }} 
-                  />
-                ) : enrollmentStatus === 'rejected' ? (
-                  <RejectedBatch 
-                    enrollment={enrollmentData} 
-                    onChooseNewBatch={() => setEnrollmentStatus('no_enrollment')} 
-                  />
-                ) : (
-                  <>
-                    {activeTab === 'dashboard' && (
-                      <Dashboard 
-                        data={dashboardData} 
-                        refreshData={fetchDashboardData} 
-                        API_URL={API_URL} 
-                        token={token} 
-                        setActiveTab={setActiveTab}
-                      />
-                    )}
-                    {activeTab === 'tasks' && <Tasks API_URL={API_URL} token={token} />}
-                    {activeTab === 'leetcode' && <LeetCode API_URL={API_URL} token={token} />}
-                    {activeTab === 'notes' && <Notes API_URL={API_URL} token={token} />}
-                    {activeTab === 'placement_prep' && <PlacementPrep API_URL={API_URL} token={token} />}
-                    {activeTab === 'grades' && <Grades API_URL={API_URL} token={token} />}
-                    {activeTab === 'leaderboard' && <Leaderboard API_URL={API_URL} token={token} />}
-                    {activeTab === 'attendance' && <Attendance API_URL={API_URL} token={token} />}
-                    {activeTab === 'leaves' && <Leaves API_URL={API_URL} token={token} />}
-                    {activeTab === 'chat' && <Chat API_URL={API_URL} token={token} batchName={dashboardData?.batch?.name || "Batch"} />}
-                    {activeTab === 'profile' && (
-                      <Profile 
-                        studentData={dashboardData?.student || user} 
-                        token={token} 
-                        API_URL={API_URL} 
-                        refreshUserData={refreshUserData} 
-                      />
-                    )}
-                  </>
-                )}
-              </>
-            )}
+              ) : (
+                // STUDENT CONTENT ROUTING
+                <>
+                  {enrollmentStatus === 'no_enrollment' ? (
+                    <BatchSelection 
+                      API_URL={API_URL} 
+                      token={token} 
+                      onEnrollmentRequested={() => {
+                        fetchEnrollmentStatus();
+                        fetchDashboardData();
+                      }} 
+                    />
+                  ) : enrollmentStatus === 'pending' ? (
+                    <PendingApproval 
+                      enrollment={enrollmentData} 
+                      onRefresh={() => {
+                        fetchEnrollmentStatus();
+                        fetchDashboardData();
+                      }} 
+                    />
+                  ) : enrollmentStatus === 'rejected' ? (
+                    <RejectedBatch 
+                      enrollment={enrollmentData} 
+                      onChooseNewBatch={() => setEnrollmentStatus('no_enrollment')} 
+                    />
+                  ) : (
+                    <>
+                      {activeTab === 'dashboard' && (
+                        <Dashboard 
+                          data={dashboardData} 
+                          refreshData={fetchDashboardData} 
+                          API_URL={API_URL} 
+                          token={token} 
+                          setActiveTab={setActiveTab}
+                        />
+                      )}
+                      {activeTab === 'tasks' && <Tasks API_URL={API_URL} token={token} />}
+                      {activeTab === 'leetcode' && <LeetCode API_URL={API_URL} token={token} />}
+                      {activeTab === 'notes' && <Notes API_URL={API_URL} token={token} />}
+                      {activeTab === 'placement_prep' && <PlacementPrep API_URL={API_URL} token={token} />}
+                      {activeTab === 'grades' && <Grades API_URL={API_URL} token={token} />}
+                      {activeTab === 'leaderboard' && <Leaderboard API_URL={API_URL} token={token} />}
+                      {activeTab === 'attendance' && <Attendance API_URL={API_URL} token={token} />}
+                      {activeTab === 'leaves' && <Leaves API_URL={API_URL} token={token} />}
+                      {activeTab === 'chat' && <Chat API_URL={API_URL} token={token} batchName={dashboardData?.batch?.name || "Batch"} />}
+                      {activeTab === 'profile' && (
+                        <Profile 
+                          studentData={dashboardData?.student || user} 
+                          token={token} 
+                          API_URL={API_URL} 
+                          refreshUserData={refreshUserData} 
+                        />
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+            </Suspense>
           </div>
         </main>
       </div>

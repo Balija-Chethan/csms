@@ -27,6 +27,32 @@ def get_student_batch(student):
     enrollment = BatchEnrollment.objects.filter(student=student, status='approved').first()
     return enrollment.batch if enrollment else None
 
+def get_leaderboard_rankings(batch):
+    from django.db.models import Count, Sum, Q
+    from django.db.models.functions import Coalesce
+    
+    students = User.objects.filter(
+        enrollments__batch=batch, 
+        enrollments__status='approved'
+    ).annotate(
+        graded_submissions_count=Count('submissions', filter=Q(submissions__grade__isnull=False), distinct=True),
+        mocks_score_sum=Coalesce(Sum('mock_results__total_score'), 0, distinct=True)
+    )
+    
+    rankings = []
+    for s in students:
+        tasks_score = s.graded_submissions_count * 100
+        mock_score = s.mocks_score_sum
+        rankings.append({
+            'id': s.id,
+            'name': s.get_full_name() or s.username,
+            'tasksScore': tasks_score,
+            'mocksScore': mock_score,
+            'overallScore': tasks_score + mock_score
+        })
+    rankings.sort(key=lambda x: x['overallScore'], reverse=True)
+    return rankings
+
 def update_user_last_seen(user):
     if not user or not user.is_authenticated:
         return
@@ -179,20 +205,12 @@ def student_dashboard(request):
     completion_rate = round((completed_submissions / total_tasks) * 100) if total_tasks > 0 else 0
 
     # 2. Leaderboard Rank
-    students_in_batch = User.objects.filter(enrollments__batch=batch, enrollments__status='approved')
-    rankings = []
-    for s in students_in_batch:
-        tasks_score = Submission.objects.filter(student=s, grade__isnull=False).count() * 100
-        mock_score = sum([m.total_score for m in MockDriveResult.objects.filter(student=s)])
-        total_score = tasks_score + mock_score
-        rankings.append((s.id, total_score))
-    
-    rankings.sort(key=lambda x: x[1], reverse=True)
+    rankings = get_leaderboard_rankings(batch)
     my_rank = 1
-    for r in rankings:
-        if r[0] == user.id:
+    for idx, r in enumerate(rankings):
+        if r['id'] == user.id:
+            my_rank = idx + 1
             break
-        my_rank += 1
 
     # 3. Attendance Summary
     logs = AttendanceLog.objects.filter(student=user)
@@ -534,28 +552,12 @@ def student_leaderboard(request):
     if not batch:
         return Response([])
 
-    students = User.objects.filter(enrollments__batch=batch, enrollments__status='approved')
-    leaderboard_data = []
-    
-    for s in students:
-        tasks_score = Submission.objects.filter(student=s, grade__isnull=False).count() * 100
-        mock_score = sum([m.total_score for m in MockDriveResult.objects.filter(student=s)])
-        total_score = tasks_score + mock_score
-        
-        leaderboard_data.append({
-            'id': s.id,
-            'name': s.get_full_name() or s.username,
-            'tasksScore': tasks_score,
-            'mocksScore': mock_score,
-            'overallScore': total_score,
-            'is_me': s.id == user.id
-        })
-
-    leaderboard_data.sort(key=lambda x: x['overallScore'], reverse=True)
-    for idx, entry in enumerate(leaderboard_data):
+    rankings = get_leaderboard_rankings(batch)
+    for idx, entry in enumerate(rankings):
         entry['rank'] = idx + 1
+        entry['is_me'] = entry['id'] == user.id
         
-    return Response(leaderboard_data)
+    return Response(rankings)
 
 
 @api_view(['GET', 'POST'])
@@ -763,7 +765,7 @@ def admin_get_submissions(request):
     except PermissionError as e:
         return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
 
-    submissions = Submission.objects.all().order_by('-submitted_at')
+    submissions = Submission.objects.select_related('student', 'task', 'task__batch').all().order_by('-submitted_at')
     return Response(SubmissionSerializer(submissions, many=True).data)
 
 
@@ -805,7 +807,7 @@ def admin_get_leaves(request):
     except PermissionError as e:
         return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
 
-    leaves = LeaveRequest.objects.all().order_by('-created_at')
+    leaves = LeaveRequest.objects.select_related('student').all().order_by('-created_at')
     return Response(LeaveRequestSerializer(leaves, many=True).data)
 
 
@@ -851,7 +853,7 @@ def admin_get_attendance(request):
     except PermissionError as e:
         return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
 
-    logs = AttendanceLog.objects.all().order_by('-date', 'student__username')
+    logs = AttendanceLog.objects.select_related('student').all().order_by('-date', 'student__username')
     return Response(AttendanceLogSerializer(logs, many=True).data)
 
 
