@@ -19,6 +19,7 @@ urlpatterns = [
     path('student/chat/', views.student_chat, name='chat'),
     path('student/attendance/', views.get_attendance_log, name='attendance_log'),
     path('student/placement-prep/', views.get_placement_prep, name='placement_prep'),
+    path('student/heartbeat/', views.student_heartbeat, name='heartbeat'),
 
     # Admin Operations
     path('admin/stats/', views.admin_dashboard_stats, name='admin_stats'),
@@ -31,5 +32,24 @@ urlpatterns = [
     path('admin/resolve-leave/', views.admin_resolve_leave, name='admin_resolve_leave'),
     path('admin/attendance/', views.admin_get_attendance, name='admin_get_attendance'),
     path('admin/create-leetcode-challenge/', views.admin_create_leetcode_challenge, name='admin_create_leetcode_challenge'),
+    path('admin/bulk-create-leetcode/', views.admin_bulk_create_leetcode, name='admin_bulk_create_leetcode'),
     path('admin/create-batch/', views.admin_create_batch, name='admin_create_batch'),
+
+    # Admin Extended Operations
+    path('admin/notes/create/', views.admin_create_study_note, name='admin_create_note'),
+    path('admin/notes/delete/', views.admin_delete_study_note, name='admin_delete_note'),
+    path('admin/mock-results/', views.admin_get_mock_results, name='admin_get_mock_results'),
+    path('admin/mock-results/create/', views.admin_create_mock_result, name='admin_create_mock_result'),
+    path('admin/company/create/', views.admin_create_company, name='admin_create_company'),
+    path('admin/placement-round/create/', views.admin_create_placement_round, name='admin_create_placement_round'),
+    path('admin/placement-resource/create/', views.admin_create_placement_resource, name='admin_create_placement_resource'),
+    path('admin/users/', views.admin_get_users, name='admin_get_users'),
+    path('admin/users/create/', views.admin_create_student, name='admin_create_user'),
+    path('admin/batch/<int:batch_id>/', views.admin_manage_batch, name='admin_manage_batch'),
+    path('admin/user/<int:user_id>/', views.admin_manage_user, name='admin_manage_user'),
+    path('admin/remove-student-batch/', views.admin_remove_student_batch, name='admin_remove_student_batch'),
+    path('admin/task/<int:task_id>/', views.admin_manage_task, name='admin_manage_task'),
 ]
+
+
+

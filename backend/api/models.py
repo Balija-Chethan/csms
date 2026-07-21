@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.utils import timezone
 
 class User(AbstractUser):
     ROLE_CHOICES = [
@@ -14,6 +15,7 @@ class User(AbstractUser):
     linkedin_url = models.URLField(blank=True, null=True)
     portfolio_url = models.URLField(blank=True, null=True)
     hackerrank_url = models.URLField(blank=True, null=True)
+    last_seen = models.DateTimeField(blank=True, null=True, db_index=True, help_text="Timestamp of last API activity")
 
 
 class Batch(models.Model):
@@ -73,11 +75,16 @@ class Submission(models.Model):
 class LeetcodeChallenge(models.Model):
     title = models.CharField(max_length=200)
     url = models.URLField()
-    deadline = models.DateTimeField()
+    available_date = models.DateField(default=timezone.now, db_index=True, help_text="Date when this problem unlocks")
+    day_number = models.IntegerField(default=1, help_text="Day 1 to 10 designation")
+    deadline = models.DateTimeField(db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        ordering = ['available_date', 'day_number']
+
     def __str__(self):
-        return self.title
+        return f"Day {self.day_number}: {self.title} ({self.available_date})"
 
 
 class LeetcodeSubmission(models.Model):
@@ -93,9 +100,13 @@ class LeetcodeSubmission(models.Model):
 
     class Meta:
         unique_together = ('challenge', 'student')
+        indexes = [
+            models.Index(fields=['student', 'challenge']),
+        ]
 
     def __str__(self):
         return f"{self.student.username} - {self.challenge.title}"
+
 
 
 class StudyNote(models.Model):

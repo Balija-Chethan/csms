@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Award, ExternalLink, MessageSquare, Send } from 'lucide-react';
+import { Award, ExternalLink, Send, CheckCircle2, Filter } from 'lucide-react';
 
 export default function AdminGrades({ API_URL, token }) {
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all'); // 'all', 'pending', 'graded'
   const [gradeInput, setGradeInput] = useState({});
   const [feedbackInput, setFeedbackInput] = useState({});
   const [grading, setGrading] = useState({});
@@ -16,7 +17,6 @@ export default function AdminGrades({ API_URL, token }) {
       const data = await res.json();
       setSubmissions(data);
       
-      // Initialize inputs
       const grades = {};
       const feedbacks = {};
       data.forEach(sub => {
@@ -38,8 +38,8 @@ export default function AdminGrades({ API_URL, token }) {
 
   const handleGrade = async (submissionId) => {
     const grade = gradeInput[submissionId];
-    const feedback = feedbackInput[submissionId];
-    if (!grade) return alert('Please enter a grade score (e.g. 10/10)');
+    const feedback = feedbackInput[submissionId] || '';
+    if (!grade || !grade.trim()) return alert('Please enter a grade score (e.g. 10/10)');
 
     setGrading(prev => ({ ...prev, [submissionId]: true }));
     try {
@@ -49,13 +49,14 @@ export default function AdminGrades({ API_URL, token }) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ submissionId, grade, feedback })
+        body: JSON.stringify({ submissionId, grade: grade.trim(), feedback: feedback.trim() })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
+      // Local state update for instant feedback
+      setSubmissions(prev => prev.map(s => s.id === submissionId ? { ...s, grade: grade.trim(), feedback: feedback.trim() } : s));
       alert('Submission graded successfully!');
-      fetchSubmissions();
     } catch (err) {
       alert(err.message);
     } finally {
@@ -63,34 +64,71 @@ export default function AdminGrades({ API_URL, token }) {
     }
   };
 
-  if (loading) return <div style={{ color: '#fff' }}>Loading student submissions...</div>;
+  if (loading) return <div style={{ color: '#fff', padding: 24 }}>Loading student submissions...</div>;
+
+  const filteredSubmissions = submissions.filter(sub => {
+    if (filter === 'pending') return !sub.grade;
+    if (filter === 'graded') return !!sub.grade;
+    return true;
+  });
+
+  const pendingCount = submissions.filter(s => !s.grade).length;
+  const gradedCount = submissions.filter(s => !!s.grade).length;
 
   return (
     <div style={styles.container}>
       <h2 style={styles.header}>
-        <Award size={28} style={{ color: '#3b82f6' }} /> Grade Submissions
+        <Award size={28} style={{ color: '#3b82f6' }} /> Grade Student Submissions
       </h2>
       <p style={styles.subheader}>
-        Review student task uploads, verify coding links on GitHub, assign grades, and input developer feedback.
+        Review student task uploads, verify GitHub repositories, award grades, and provide feedback.
       </p>
 
-      {submissions.length === 0 ? (
-        <div className="glass-card" style={{ padding: 32, textAlign: 'center' }}>
-          <h3>No submissions logged yet</h3>
-          <p style={{ color: '#9ca3af', marginTop: 8 }}>Tasks assigned to active batches have not received uploads.</p>
+      {/* Filter Tabs */}
+      <div style={styles.tabRow}>
+        <button 
+          style={filter === 'all' ? styles.tabActive : styles.tab}
+          onClick={() => setFilter('all')}
+        >
+          All Submissions ({submissions.length})
+        </button>
+        <button 
+          style={filter === 'pending' ? styles.tabActiveYellow : styles.tab}
+          onClick={() => setFilter('pending')}
+        >
+          Pending Review ({pendingCount})
+        </button>
+        <button 
+          style={filter === 'graded' ? styles.tabActiveGreen : styles.tab}
+          onClick={() => setFilter('graded')}
+        >
+          Graded ({gradedCount})
+        </button>
+      </div>
+
+      {filteredSubmissions.length === 0 ? (
+        <div className="glass-card" style={{ padding: 36, textAlign: 'center' }}>
+          <h3>No submissions in this category</h3>
+          <p style={{ color: '#9ca3af', marginTop: 8 }}>
+            {filter === 'pending' ? 'All student submissions have been reviewed and graded!' : 'No student uploads recorded yet.'}
+          </p>
         </div>
       ) : (
         <div style={styles.grid}>
-          {submissions.map(sub => (
+          {filteredSubmissions.map(sub => (
             <div key={sub.id} className="glass-card" style={styles.card}>
               <div style={styles.cardHeader}>
                 <div>
                   <h3 style={styles.taskTitle}>{sub.task_title}</h3>
-                  <span style={styles.studentName}>{sub.student_name} ({sub.student_roll})</span>
+                  <span style={styles.studentName}>
+                    {sub.student_name || 'Student'} ({sub.student_roll || 'No Roll'})
+                  </span>
                 </div>
                 <div>
                   {sub.grade ? (
-                    <span className="badge badge-success">Graded ({sub.grade})</span>
+                    <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <CheckCircle2 size={12} /> Graded ({sub.grade})
+                    </span>
                   ) : (
                     <span className="badge badge-warning">Pending Review</span>
                   )}
@@ -99,9 +137,9 @@ export default function AdminGrades({ API_URL, token }) {
 
               <div style={styles.bodyRow}>
                 <a href={sub.github_url} target="_blank" rel="noopener noreferrer" style={styles.link}>
-                  View Student GitHub Code <ExternalLink size={14} />
+                  View GitHub Code <ExternalLink size={14} />
                 </a>
-                <span style={styles.date}>Submitted: {new Date(sub.submitted_at).toLocaleDateString()}</span>
+                <span style={styles.date}>Uploaded: {new Date(sub.submitted_at).toLocaleDateString()}</span>
               </div>
 
               <div style={styles.gradingSection}>
@@ -133,7 +171,7 @@ export default function AdminGrades({ API_URL, token }) {
                   disabled={grading[sub.id]}
                   style={{ width: '100%', justifyContent: 'center', marginTop: 8 }}
                 >
-                  <Send size={14} /> {grading[sub.id] ? 'Submitting grade...' : 'Save Grade & Feedback'}
+                  <Send size={14} /> {grading[sub.id] ? 'Saving...' : 'Save Grade & Feedback'}
                 </button>
               </div>
             </div>
@@ -155,6 +193,7 @@ const styles = {
     alignItems: 'center',
     gap: 12,
     color: '#ffffff',
+    fontSize: 24,
   },
   subheader: {
     fontSize: 14,
@@ -163,15 +202,69 @@ const styles = {
     paddingBottom: 20,
     marginTop: -8,
   },
+  tabRow: {
+    display: 'flex',
+    gap: 10,
+    background: 'rgba(255,255,255,0.02)',
+    padding: 6,
+    borderRadius: 10,
+    border: '1px solid rgba(255,255,255,0.05)',
+  },
+  tab: {
+    flex: 1,
+    background: 'none',
+    border: 'none',
+    color: '#9ca3af',
+    padding: '10px 14px',
+    borderRadius: 6,
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    fontSize: 13,
+    transition: 'all 0.2s',
+  },
+  tabActive: {
+    flex: 1,
+    background: 'rgba(59, 130, 246, 0.15)',
+    border: '1px solid rgba(59, 130, 246, 0.3)',
+    color: '#3b82f6',
+    padding: '10px 14px',
+    borderRadius: 6,
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  tabActiveYellow: {
+    flex: 1,
+    background: 'rgba(245, 158, 11, 0.15)',
+    border: '1px solid rgba(245, 158, 11, 0.3)',
+    color: '#fbbf24',
+    padding: '10px 14px',
+    borderRadius: 6,
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  tabActiveGreen: {
+    flex: 1,
+    background: 'rgba(16, 185, 129, 0.15)',
+    border: '1px solid rgba(16, 185, 129, 0.3)',
+    color: '#34d399',
+    padding: '10px 14px',
+    borderRadius: 6,
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
     gap: 20,
   },
   card: {
     display: 'flex',
     flexDirection: 'column',
     gap: 16,
+    padding: 20,
   },
   cardHeader: {
     display: 'flex',
@@ -179,21 +272,22 @@ const styles = {
     alignItems: 'flex-start',
   },
   taskTitle: {
-    fontSize: 18,
+    fontSize: 17,
     color: '#ffffff',
+    fontWeight: 'bold',
   },
   studentName: {
     fontSize: 13,
     color: '#9ca3af',
     display: 'block',
-    marginTop: 2,
+    marginTop: 3,
   },
   bodyRow: {
     display: 'flex',
     justifyContent: 'space-between',
     fontSize: 13,
     alignItems: 'center',
-    background: 'rgba(0,0,0,0.15)',
+    background: 'rgba(0,0,0,0.18)',
     padding: 12,
     borderRadius: 8,
   },
@@ -207,6 +301,7 @@ const styles = {
   },
   date: {
     color: '#9ca3af',
+    fontSize: 12,
   },
   gradingSection: {
     borderTop: '1px solid rgba(255,255,255,0.06)',

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Award, Flame, ExternalLink, Send } from 'lucide-react';
+import { Award, Flame, ExternalLink, Send, Lock, CheckCircle2, Calendar, Users, Sparkles } from 'lucide-react';
 
 export default function LeetCode({ API_URL, token }) {
   const [data, setData] = useState(null);
@@ -51,70 +51,181 @@ export default function LeetCode({ API_URL, token }) {
     }
   };
 
-  if (loading || !data) return <div style={{ color: '#fff' }}>Loading LeetCode challenge logs...</div>;
+  if (loading || !data) return <div style={{ color: '#fff', padding: 24 }}>Loading LeetCode challenge logs & 10-day roadmap...</div>;
+
+  const todayChallenge = data.challenges.find(c => c.is_today || (c.is_unlocked && !c.submission));
 
   return (
     <div style={styles.container}>
+      {/* Top Metrics Row */}
       <div style={styles.statsRow}>
-        <div className="glass-card" style={styles.statCard}>
+        <div className="glass-card glow-card-red" style={styles.statCard}>
           <Flame size={32} style={{ color: '#ef4444' }} />
           <div>
             <div style={styles.statVal}>{data.streak} Days</div>
-            <div style={styles.statLabel}>Current Streak</div>
+            <div style={styles.statLabel}>Current Coding Streak</div>
           </div>
         </div>
-        <div className="glass-card" style={styles.statCard}>
+        <div className="glass-card glow-card-gold" style={styles.statCard}>
           <Award size={32} style={{ color: '#eab308' }} />
           <div>
-            <div style={styles.statVal}>{data.solved} Solved</div>
-            <div style={styles.statLabel}>Problems Completed</div>
+            <div style={styles.statVal}>{data.solved} / {data.challenges.length} Solved</div>
+            <div style={styles.statLabel}>Total Problems Completed</div>
+          </div>
+        </div>
+        <div className="glass-card glow-card-blue" style={styles.statCard}>
+          <Users size={32} style={{ color: '#3b82f6' }} />
+          <div>
+            <div style={styles.statVal}>
+              <span className="live-dot-inline"></span> {data.onlineStudents || 1} Online
+            </div>
+            <div style={styles.statLabel}>Active Peers Concurrent</div>
           </div>
         </div>
       </div>
 
-      <h2 style={styles.header}>Daily LeetCode Challenges</h2>
+      {/* Spotlight Header Banner for Today's Unlocked Problem */}
+      {todayChallenge && (
+        <div className="glass-card spotlight-card" style={styles.spotlightCard}>
+          <div style={styles.spotlightHeader}>
+            <div className="spotlight-tag">
+              <Sparkles size={14} /> TODAY'S ACTIVE CHALLENGE (1 CODE / DAY)
+            </div>
+            <span className="badge badge-success">Unlocked Today</span>
+          </div>
 
-      <div style={styles.grid}>
-        {data.challenges.map(ch => (
-          <div key={ch.id} className="glass-card" style={styles.card}>
-            <h3 style={styles.title}>{ch.title}</h3>
-            
-            <a href={ch.url} target="_blank" rel="noopener noreferrer" style={styles.problemLink}>
-              View Problem on LeetCode <ExternalLink size={14} />
-            </a>
+          <h2 style={styles.spotlightTitle}>Day {todayChallenge.day_number}: {todayChallenge.title}</h2>
+          
+          <p style={styles.spotlightSub}>
+            Complete today's coding problem to maintain your daily streak. Submissions close at midnight.
+          </p>
 
-            <div style={styles.deadline}>Deadline: {new Date(ch.deadline).toLocaleString()}</div>
+          <div style={styles.spotlightActions}>
+            {todayChallenge.url && (
+              <a href={todayChallenge.url} target="_blank" rel="noopener noreferrer" className="btn-primary" style={{ textDecoration: 'none' }}>
+                Open Problem on LeetCode <ExternalLink size={16} />
+              </a>
+            )}
 
-            {ch.submission ? (
-              <div style={styles.subStatus}>
-                <span className="badge badge-success">Completed</span>
-                <a href={ch.submission.submission_url} target="_blank" rel="noopener noreferrer" style={styles.subLink}>
-                  View Submission <ExternalLink size={12} />
+            {todayChallenge.submission ? (
+              <div style={styles.completedBanner}>
+                <CheckCircle2 size={20} style={{ color: '#10b981' }} />
+                <span>Submitted: Ready for Evaluation</span>
+                <a href={todayChallenge.submission.submission_url} target="_blank" rel="noopener noreferrer" style={styles.subLinkInline}>
+                  View Solution Link <ExternalLink size={14} />
                 </a>
               </div>
             ) : (
-              <div style={styles.submitSection}>
+              <div style={styles.spotlightInputGroup}>
                 <input 
                   type="url" 
                   className="custom-input" 
-                  placeholder="https://leetcode.com/problems/.../submissions/..."
-                  value={submitUrl[ch.id] || ''}
-                  onChange={e => setSubmitUrl(prev => ({ ...prev, [ch.id]: e.target.value }))}
-                  style={{ marginBottom: 12 }}
+                  placeholder="Paste LeetCode submission URL (e.g. https://leetcode.com/submissions/...)"
+                  value={submitUrl[todayChallenge.id] || ''}
+                  onChange={e => setSubmitUrl(prev => ({ ...prev, [todayChallenge.id]: e.target.value }))}
+                  style={{ flex: 1 }}
                 />
                 <button 
                   className="btn-primary" 
-                  onClick={() => handleSubmit(ch.id)}
-                  disabled={submitting[ch.id]}
-                  style={{ width: '100%', justifyContent: 'center' }}
+                  onClick={() => handleSubmit(todayChallenge.id)}
+                  disabled={submitting[todayChallenge.id]}
                 >
-                  {submitting[ch.id] ? 'Submitting...' : 'Submit Leetcode URL'}
-                  <Send size={14} />
+                  <Send size={16} />
+                  {submitting[todayChallenge.id] ? 'Submitting...' : 'Submit Code'}
                 </button>
               </div>
             )}
           </div>
-        ))}
+        </div>
+      )}
+
+      {/* 10-Day Curriculum Roadmap Grid */}
+      <div>
+        <h3 style={styles.sectionTitle}>
+          <Calendar size={20} style={{ color: '#3b82f6', verticalAlign: 'middle', marginRight: 8 }} />
+          10-Day LeetCode Release Roadmap
+        </h3>
+        <p style={styles.sectionSubtitle}>
+          Challenges are released strictly 1 problem per day. Future days remain locked until their scheduled date.
+        </p>
+
+        <div style={styles.grid}>
+          {data.challenges.map(ch => {
+            const isCompleted = !!ch.submission;
+            const isUnlocked = ch.is_unlocked;
+            const isToday = ch.is_today;
+
+            return (
+              <div 
+                key={ch.id} 
+                className={`glass-card ${isToday ? 'active-today-border' : ''} ${!isUnlocked ? 'locked-card-style' : ''}`}
+                style={styles.card}
+              >
+                <div style={styles.cardHeader}>
+                  <span className={`day-badge ${isUnlocked ? 'day-badge-open' : 'day-badge-locked'}`}>
+                    Day {ch.day_number}
+                  </span>
+                  
+                  {isCompleted ? (
+                    <span className="badge badge-success"><CheckCircle2 size={12} /> Solved</span>
+                  ) : isUnlocked ? (
+                    <span className="badge badge-warning">Active</span>
+                  ) : (
+                    <span className="badge badge-danger" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <Lock size={12} /> Locked
+                    </span>
+                  )}
+                </div>
+
+                <h4 style={styles.title}>{ch.title}</h4>
+
+                {isUnlocked ? (
+                  <>
+                    <a href={ch.url} target="_blank" rel="noopener noreferrer" style={styles.problemLink}>
+                      View on LeetCode <ExternalLink size={13} />
+                    </a>
+
+                    <div style={styles.dateMeta}>Available Since: {ch.available_date}</div>
+
+                    {isCompleted ? (
+                      <div style={styles.subStatus}>
+                        <span style={{ fontSize: 13, color: '#34d399', fontWeight: '600' }}>Completed</span>
+                        <a href={ch.submission.submission_url} target="_blank" rel="noopener noreferrer" style={styles.subLink}>
+                          View Link <ExternalLink size={12} />
+                        </a>
+                      </div>
+                    ) : (
+                      <div style={styles.submitSection}>
+                        <input 
+                          type="url" 
+                          className="custom-input" 
+                          placeholder="https://leetcode.com/.../submissions/..."
+                          value={submitUrl[ch.id] || ''}
+                          onChange={e => setSubmitUrl(prev => ({ ...prev, [ch.id]: e.target.value }))}
+                          style={{ marginBottom: 10, fontSize: 12 }}
+                        />
+                        <button 
+                          className="btn-primary" 
+                          onClick={() => handleSubmit(ch.id)}
+                          disabled={submitting[ch.id]}
+                          style={{ width: '100%', justifyContent: 'center', fontSize: 13, padding: '8px 12px' }}
+                        >
+                          {submitting[ch.id] ? 'Submitting...' : 'Submit URL'} <Send size={13} />
+                        </button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div style={styles.lockedBox}>
+                    <Lock size={28} style={{ color: '#6b7280', margin: '12px 0 6px 0' }} />
+                    <div style={styles.lockMsg}>Unlocks on {ch.available_date}</div>
+                    <div style={styles.lockSubMsg}>1 problem released per day</div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -124,7 +235,7 @@ const styles = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 24,
+    gap: 28,
   },
   statsRow: {
     display: 'flex',
@@ -136,34 +247,109 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: 16,
-    minWidth: 200,
+    minWidth: 220,
+    padding: 20,
   },
   statVal: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#ffffff',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
   },
   statLabel: {
     fontSize: 13,
     color: '#9ca3af',
+    marginTop: 2,
   },
-  header: {
+  spotlightCard: {
+    background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%)',
+    border: '1px solid rgba(59, 130, 246, 0.4)',
+    boxShadow: '0 0 25px rgba(59, 130, 246, 0.15)',
+    padding: 28,
+    borderRadius: 16,
+  },
+  spotlightHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  spotlightTitle: {
+    fontSize: 24,
     color: '#ffffff',
-    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  spotlightSub: {
+    fontSize: 14,
+    color: '#9ca3af',
+    marginBottom: 20,
+  },
+  spotlightActions: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 16,
+  },
+  spotlightInputGroup: {
+    display: 'flex',
+    gap: 12,
+    flexWrap: 'wrap',
+  },
+  completedBanner: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    background: 'rgba(16, 185, 129, 0.12)',
+    border: '1px solid rgba(16, 185, 129, 0.3)',
+    padding: '12px 18px',
+    borderRadius: 10,
+    color: '#ffffff',
+  },
+  subLinkInline: {
+    color: '#60a5fa',
+    textDecoration: 'none',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 4,
+    fontSize: 13,
+    marginLeft: 'auto',
+  },
+  sectionTitle: {
+    color: '#ffffff',
+    fontSize: 20,
+    marginBottom: 6,
+  },
+  sectionSubtitle: {
+    color: '#9ca3af',
+    fontSize: 13,
+    marginBottom: 20,
   },
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
     gap: 20,
   },
   card: {
     display: 'flex',
     flexDirection: 'column',
+    padding: 20,
+    position: 'relative',
+    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+  },
+  cardHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   title: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#ffffff',
+    fontWeight: '600',
     marginBottom: 8,
+    lineHeight: 1.4,
   },
   problemLink: {
     color: '#3b82f6',
@@ -172,20 +358,22 @@ const styles = {
     display: 'inline-flex',
     alignItems: 'center',
     gap: 4,
-    marginBottom: 16,
+    marginBottom: 12,
   },
-  deadline: {
+  dateMeta: {
     fontSize: 12,
-    color: '#9ca3af',
-    marginBottom: 16,
+    color: '#6b7280',
+    marginBottom: 14,
   },
   submitSection: {
     borderTop: '1px solid rgba(255,255,255,0.06)',
-    paddingTop: 16,
+    paddingTop: 14,
+    marginTop: 'auto',
   },
   subStatus: {
     borderTop: '1px solid rgba(255,255,255,0.06)',
-    paddingTop: 16,
+    paddingTop: 14,
+    marginTop: 'auto',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -197,5 +385,27 @@ const styles = {
     display: 'inline-flex',
     alignItems: 'center',
     gap: 4,
+  },
+  lockedBox: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '24px 12px',
+    background: 'rgba(0,0,0,0.2)',
+    borderRadius: 10,
+    border: '1px dashed rgba(255,255,255,0.1)',
+    marginTop: 'auto',
+  },
+  lockMsg: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#d1d5db',
+    marginTop: 4,
+  },
+  lockSubMsg: {
+    fontSize: 11,
+    color: '#6b7280',
+    marginTop: 2,
   }
 };

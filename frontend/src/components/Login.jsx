@@ -65,6 +65,27 @@ export default function Login({ setAuth, API_URL }) {
     }
   };
 
+  const handleDemoAdminLogin = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`${API_URL}/auth/login/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'chethan@csms', password: 'password123' })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Admin login failed');
+      localStorage.setItem('csms_token', data.token);
+      localStorage.setItem('csms_user', JSON.stringify(data.user));
+      setAuth(data.user, data.token);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div style={styles.container}>
       {/* Decorative animated cosmic background */}
@@ -201,16 +222,29 @@ export default function Login({ setAuth, API_URL }) {
           </form>
 
           {!isRegister && (
-            <button 
-              type="button" 
-              className="btn-secondary" 
-              onClick={handleDemoLogin} 
-              style={{ ...styles.submitBtn, marginTop: 12, border: '1px solid rgba(59, 130, 246, 0.4)' }}
-            >
-              Demo Student Login (Auto-fill)
-              <ArrowRight size={18} />
-            </button>
+            <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+              <button 
+                type="button" 
+                className="btn-secondary" 
+                onClick={handleDemoLogin} 
+                style={{ flex: 1, justifyContent: 'center', border: '1px solid rgba(59, 130, 246, 0.4)', padding: '10px 8px', fontSize: 12 }}
+              >
+                Demo Student
+                <ArrowRight size={14} />
+              </button>
+
+              <button 
+                type="button" 
+                className="btn-secondary" 
+                onClick={handleDemoAdminLogin} 
+                style={{ flex: 1, justifyContent: 'center', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#f87171', padding: '10px 8px', fontSize: 12 }}
+              >
+                Demo Admin
+                <ArrowRight size={14} />
+              </button>
+            </div>
           )}
+
 
           <div style={styles.toggleContainer}>
             <span style={{ color: '#9ca3af', fontSize: 14 }}>

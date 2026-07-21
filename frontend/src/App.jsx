@@ -23,6 +23,10 @@ import AdminTasks from './components/AdminTasks';
 import AdminGrades from './components/AdminGrades';
 import AdminLeaves from './components/AdminLeaves';
 import AdminAttendance from './components/AdminAttendance';
+import AdminNotes from './components/AdminNotes';
+import AdminMockResults from './components/AdminMockResults';
+import AdminPlacementPrep from './components/AdminPlacementPrep';
+import AdminUsers from './components/AdminUsers';
 
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api";
 
@@ -32,6 +36,29 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [onlineStudents, setOnlineStudents] = useState(1);
+
+  // Periodic heartbeat for live activity tracking
+  useEffect(() => {
+    if (!token) return;
+    const sendHeartbeat = async () => {
+      try {
+        const res = await fetch(`${API_URL}/student/heartbeat/`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.onlineStudents) {
+          setOnlineStudents(data.onlineStudents);
+        }
+      } catch (err) {
+        // silent catch
+      }
+    };
+    sendHeartbeat();
+    const interval = setInterval(sendHeartbeat, 60000);
+    return () => clearInterval(interval);
+  }, [token]);
 
   // Sidebar collapsibles
   const [learningOpen, setLearningOpen] = useState(true);
@@ -43,7 +70,9 @@ export default function App() {
     setLoading(true);
     try {
       const res = await fetch(`${API_URL}/student/dashboard/`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
       if (res.status === 401) {
         handleLogout();
@@ -109,7 +138,7 @@ export default function App() {
     );
   }
 
-  if (!dashboardData) {
+  if (!dashboardData && user.role !== 'admin') {
     return (
       <div style={{ display: 'flex', height: '100vh', width: '100vw', alignItems: 'center', justifyContent: 'center', background: '#0b0f19', color: '#fff', flexDirection: 'column', gap: 16 }}>
         <h2>Error loading dashboard. Verify API server is running.</h2>
@@ -137,6 +166,13 @@ export default function App() {
         </div>
 
         <div style={styles.headerRight}>
+          <div className="live-online-pill">
+            <span className="live-dot"></span>
+            <span style={{ fontSize: 12, fontWeight: '700', color: '#34d399' }}>
+              {onlineStudents} Online
+            </span>
+          </div>
+
           <div style={styles.profileShowcase}>
             <div className="avatar-container border-none" style={{ width: 36, height: 36 }}>
               <img 
@@ -179,8 +215,9 @@ export default function App() {
                   onClick={() => setActiveTab('admin_dashboard')}
                 >
                   <LayoutDashboard size={18} />
-                  Admin Dashboard
+                  Admin Workspace
                 </button>
+
                 <button 
                   style={activeTab === 'admin_allocation' ? styles.navItemActive : styles.navItem}
                   onClick={() => setActiveTab('admin_allocation')}
@@ -188,13 +225,23 @@ export default function App() {
                   <Users size={18} />
                   Batch Allocation
                 </button>
+
+                <button 
+                  style={activeTab === 'admin_users' ? styles.navItemActive : styles.navItem}
+                  onClick={() => setActiveTab('admin_users')}
+                >
+                  <Users size={18} />
+                  User & Student Directory
+                </button>
+
                 <button 
                   style={activeTab === 'admin_tasks' ? styles.navItemActive : styles.navItem}
                   onClick={() => setActiveTab('admin_tasks')}
                 >
                   <ClipboardList size={18} />
-                  Assign Course Tasks
+                  Tasks & 10-Day LeetCode
                 </button>
+
                 <button 
                   style={activeTab === 'admin_grades' ? styles.navItemActive : styles.navItem}
                   onClick={() => setActiveTab('admin_grades')}
@@ -202,6 +249,31 @@ export default function App() {
                   <Award size={18} />
                   Grade Submissions
                 </button>
+
+                <button 
+                  style={activeTab === 'admin_mock_results' ? styles.navItemActive : styles.navItem}
+                  onClick={() => setActiveTab('admin_mock_results')}
+                >
+                  <Award size={18} />
+                  Mock Placement Scores
+                </button>
+
+                <button 
+                  style={activeTab === 'admin_notes' ? styles.navItemActive : styles.navItem}
+                  onClick={() => setActiveTab('admin_notes')}
+                >
+                  <BookOpen size={18} />
+                  Study Notes Manager
+                </button>
+
+                <button 
+                  style={activeTab === 'admin_placement_prep' ? styles.navItemActive : styles.navItem}
+                  onClick={() => setActiveTab('admin_placement_prep')}
+                >
+                  <BookOpen size={18} />
+                  Placement Prep Manager
+                </button>
+
                 <button 
                   style={activeTab === 'admin_leaves' ? styles.navItemActive : styles.navItem}
                   onClick={() => setActiveTab('admin_leaves')}
@@ -209,12 +281,13 @@ export default function App() {
                   <ShieldAlert size={18} />
                   Audit Leave Requests
                 </button>
+
                 <button 
                   style={activeTab === 'admin_attendance' ? styles.navItemActive : styles.navItem}
                   onClick={() => setActiveTab('admin_attendance')}
                 >
                   <Clock size={18} />
-                  Attendance Logs
+                  Attendance Logs Audit
                 </button>
               </>
             ) : (
@@ -362,11 +435,16 @@ export default function App() {
               <>
                 {activeTab === 'admin_dashboard' && <AdminDashboard API_URL={API_URL} token={token} />}
                 {activeTab === 'admin_allocation' && <AdminAllocation API_URL={API_URL} token={token} />}
+                {activeTab === 'admin_users' && <AdminUsers API_URL={API_URL} token={token} />}
                 {activeTab === 'admin_tasks' && <AdminTasks API_URL={API_URL} token={token} />}
                 {activeTab === 'admin_grades' && <AdminGrades API_URL={API_URL} token={token} />}
+                {activeTab === 'admin_mock_results' && <AdminMockResults API_URL={API_URL} token={token} />}
+                {activeTab === 'admin_notes' && <AdminNotes API_URL={API_URL} token={token} />}
+                {activeTab === 'admin_placement_prep' && <AdminPlacementPrep API_URL={API_URL} token={token} />}
                 {activeTab === 'admin_leaves' && <AdminLeaves API_URL={API_URL} token={token} />}
                 {activeTab === 'admin_attendance' && <AdminAttendance API_URL={API_URL} token={token} />}
               </>
+
             ) : (
               // STUDENT CONTENT ROUTING
               <>

@@ -1,18 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { ClipboardList, PlusCircle, Calendar, Send, Code } from 'lucide-react';
+import { ClipboardList, PlusCircle, Calendar, Send, Code, Sparkles } from 'lucide-react';
 
 export default function AdminTasks({ API_URL, token }) {
   const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [taskType, setTaskType] = useState('regular'); // 'regular' or 'leetcode'
+  const [taskType, setTaskType] = useState('regular'); // 'regular', 'leetcode', 'bulk_leetcode'
 
-  // Input states
+  // Regular & single LeetCode states
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [leetcodeUrl, setLeetcodeUrl] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [selectedBatchId, setSelectedBatchId] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // 10-Day Bulk LeetCode states
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [startDate, setStartDate] = useState(todayStr);
+  const [bulkItems, setBulkItems] = useState(
+    Array.from({ length: 10 }, (_, i) => ({ dayNumber: i + 1, title: '', url: '' }))
+  );
 
   useEffect(() => {
     const fetchBatches = async () => {
@@ -33,6 +40,30 @@ export default function AdminTasks({ API_URL, token }) {
     };
     fetchBatches();
   }, []);
+
+  const handleBulkChange = (index, field, value) => {
+    setBulkItems(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const handleFillSample = () => {
+    const samples = [
+      { dayNumber: 1, title: '1. Two Sum', url: 'https://leetcode.com/problems/two-sum/' },
+      { dayNumber: 2, title: '9. Palindrome Number', url: 'https://leetcode.com/problems/palindrome-number/' },
+      { dayNumber: 3, title: '46. Permutations', url: 'https://leetcode.com/problems/permutations/' },
+      { dayNumber: 4, title: '47. Permutations II', url: 'https://leetcode.com/problems/permutations-ii/' },
+      { dayNumber: 5, title: '53. Maximum Subarray', url: 'https://leetcode.com/problems/maximum-subarray/' },
+      { dayNumber: 6, title: '70. Climbing Stairs', url: 'https://leetcode.com/problems/climbing-stairs/' },
+      { dayNumber: 7, title: '121. Best Time to Buy/Sell Stock', url: 'https://leetcode.com/problems/best-time-to-buy-and-sell-stock/' },
+      { dayNumber: 8, title: '141. Linked List Cycle', url: 'https://leetcode.com/problems/linked-list-cycle/' },
+      { dayNumber: 9, title: '206. Reverse Linked List', url: 'https://leetcode.com/problems/reverse-linked-list/' },
+      { dayNumber: 10, title: '242. Valid Anagram', url: 'https://leetcode.com/problems/valid-anagram/' },
+    ];
+    setBulkItems(samples);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -63,8 +94,7 @@ export default function AdminTasks({ API_URL, token }) {
       } finally {
         setSubmitting(false);
       }
-    } else {
-      // LeetCode Challenge
+    } else if (taskType === 'leetcode') {
       if (!title || !leetcodeUrl || !dueDate) {
         return alert('Missing required LeetCode challenge fields');
       }
@@ -76,15 +106,40 @@ export default function AdminTasks({ API_URL, token }) {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({ title, url: leetcodeUrl, deadline: dueDate })
+          body: JSON.stringify({ title, url: leetcodeUrl, deadline: dueDate, availableDate: dueDate })
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
 
-        alert('LeetCode Daily Challenge created and assigned globally!');
+        alert('LeetCode Daily Challenge created and assigned!');
         setTitle('');
         setLeetcodeUrl('');
         setDueDate('');
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        setSubmitting(false);
+      }
+    } else if (taskType === 'bulk_leetcode') {
+      const validItems = bulkItems.filter(item => item.title.trim() && item.url.trim());
+      if (validItems.length === 0) {
+        return alert('Please enter at least 1 valid LeetCode problem (Title & URL)');
+      }
+
+      setSubmitting(true);
+      try {
+        const res = await fetch(`${API_URL}/admin/bulk-create-leetcode/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ startDate, challenges: validItems })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        alert(`Successfully scheduled ${data.count} LeetCode challenges for 10-day release cycle!`);
       } catch (err) {
         alert(err.message);
       } finally {
@@ -98,7 +153,7 @@ export default function AdminTasks({ API_URL, token }) {
   return (
     <div style={styles.container}>
       <h2 style={styles.header}>
-        <ClipboardList size={28} style={{ color: '#3b82f6', verticalAlign: 'middle', marginRight: 8 }} /> Task Administration
+        <ClipboardList size={28} style={{ color: '#3b82f6', verticalAlign: 'middle', marginRight: 8 }} /> Task & Challenge Administration
       </h2>
       
       <div style={styles.layout}>
@@ -106,10 +161,14 @@ export default function AdminTasks({ API_URL, token }) {
           <h3 style={styles.sectionHeader}>
             {taskType === 'regular' ? (
               <PlusCircle size={18} style={{ color: '#3b82f6' }} />
-            ) : (
+            ) : taskType === 'leetcode' ? (
               <Code size={18} style={{ color: '#eab308' }} />
+            ) : (
+              <Sparkles size={18} style={{ color: '#a855f7' }} />
             )}
-            <span>{taskType === 'regular' ? 'Assign New Task' : 'Assign Daily LeetCode Challenge'}</span>
+            <span>
+              {taskType === 'regular' ? 'Assign Worksheet Task' : taskType === 'leetcode' ? 'Single LeetCode Challenge' : '10-Day LeetCode Bulk Scheduler'}
+            </span>
           </h3>
 
           {/* Task Type Switcher Toggle */}
@@ -117,29 +176,28 @@ export default function AdminTasks({ API_URL, token }) {
             <button 
               type="button"
               style={taskType === 'regular' ? styles.toggleBtnActive : styles.toggleBtn}
-              onClick={() => {
-                setTaskType('regular');
-                setTitle('');
-                setDueDate('');
-              }}
+              onClick={() => setTaskType('regular')}
             >
-              Regular Worksheet
+              Worksheet Task
             </button>
             <button 
               type="button"
               style={taskType === 'leetcode' ? styles.toggleBtnActive : styles.toggleBtn}
-              onClick={() => {
-                setTaskType('leetcode');
-                setTitle('');
-                setDueDate('');
-              }}
+              onClick={() => setTaskType('leetcode')}
             >
-              LeetCode Challenge
+              Single LeetCode
+            </button>
+            <button 
+              type="button"
+              style={taskType === 'bulk_leetcode' ? styles.toggleBtnActivePurple : styles.toggleBtn}
+              onClick={() => setTaskType('bulk_leetcode')}
+            >
+              ✨ 10-Day Schedule Bulk
             </button>
           </div>
 
           <form onSubmit={handleSubmit} style={styles.form}>
-            {taskType === 'regular' ? (
+            {taskType === 'regular' && (
               <>
                 <div style={styles.inputWrapper}>
                   <label style={styles.label}>Select Target Batch</label>
@@ -168,18 +226,31 @@ export default function AdminTasks({ API_URL, token }) {
                 </div>
 
                 <div style={styles.inputWrapper}>
-                  <label style={styles.label}>Task Instructions (Markdown supported)</label>
+                  <label style={styles.label}>Task Instructions</label>
                   <textarea 
                     className="custom-input" 
-                    placeholder="Describe task description, GitHub requirements, etc..."
+                    placeholder="Describe task description, GitHub requirements..."
                     value={description} 
                     onChange={e => setDescription(e.target.value)} 
                     style={{ minHeight: 140, resize: 'vertical' }}
                     required 
                   />
                 </div>
+
+                <div style={styles.inputWrapper}>
+                  <label style={styles.label}>Due Date / Deadline</label>
+                  <input 
+                    type="date" 
+                    className="custom-input" 
+                    value={dueDate} 
+                    onChange={e => setDueDate(e.target.value)} 
+                    required 
+                  />
+                </div>
               </>
-            ) : (
+            )}
+
+            {taskType === 'leetcode' && (
               <>
                 <div style={styles.inputWrapper}>
                   <label style={styles.label}>Challenge Title</label>
@@ -204,23 +275,82 @@ export default function AdminTasks({ API_URL, token }) {
                     required 
                   />
                 </div>
+
+                <div style={styles.inputWrapper}>
+                  <label style={styles.label}>Scheduled Date</label>
+                  <input 
+                    type="date" 
+                    className="custom-input" 
+                    value={dueDate} 
+                    onChange={e => setDueDate(e.target.value)} 
+                    required 
+                  />
+                </div>
               </>
             )}
 
-            <div style={styles.inputWrapper}>
-              <label style={styles.label}>Due Date / Deadline</label>
-              <input 
-                type="date" 
-                className="custom-input" 
-                value={dueDate} 
-                onChange={e => setDueDate(e.target.value)} 
-                required 
-              />
-            </div>
+            {taskType === 'bulk_leetcode' && (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <div style={styles.inputWrapper}>
+                    <label style={styles.label}>Day 1 Release Start Date</label>
+                    <input 
+                      type="date" 
+                      className="custom-input" 
+                      value={startDate} 
+                      onChange={e => setStartDate(e.target.value)} 
+                      required 
+                    />
+                  </div>
+                  <button 
+                    type="button" 
+                    className="btn-secondary" 
+                    onClick={handleFillSample}
+                    style={{ fontSize: 12, padding: '8px 12px', marginTop: 18 }}
+                  >
+                    ✨ Auto-Fill 10 Sample Problems
+                  </button>
+                </div>
 
-            <button type="submit" className="btn-primary" disabled={submitting} style={{ justifyContent: 'center', marginTop: 12 }}>
+                <p style={{ fontSize: 13, color: '#9ca3af', marginBottom: 16 }}>
+                  Enter 10 days of LeetCode challenges below. Each day's problem will unlock automatically for students on consecutive dates (1 code per day).
+                </p>
+
+                <div style={styles.bulkGrid}>
+                  {bulkItems.map((item, idx) => (
+                    <div key={idx} style={styles.bulkRow}>
+                      <span className="day-badge day-badge-open" style={{ minWidth: 54, textAlign: 'center' }}>
+                        Day {item.dayNumber}
+                      </span>
+                      <input 
+                        type="text" 
+                        className="custom-input" 
+                        placeholder="Problem Title (e.g. Two Sum)"
+                        value={item.title}
+                        onChange={e => handleBulkChange(idx, 'title', e.target.value)}
+                        style={{ flex: 1, fontSize: 13 }}
+                      />
+                      <input 
+                        type="url" 
+                        className="custom-input" 
+                        placeholder="LeetCode URL"
+                        value={item.url}
+                        onChange={e => handleBulkChange(idx, 'url', e.target.value)}
+                        style={{ flex: 1.5, fontSize: 13 }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            <button type="submit" className="btn-primary" disabled={submitting} style={{ justifyContent: 'center', marginTop: 16, padding: '12px 20px' }}>
               <Send size={16} /> 
-              {submitting ? 'Assigning...' : (taskType === 'regular' ? 'Assign Task to Batch' : 'Assign Challenge Globally')}
+              {submitting ? 'Processing...' : (
+                taskType === 'regular' ? 'Assign Task to Batch' : 
+                taskType === 'leetcode' ? 'Assign Single Challenge' : 
+                'Schedule 10-Day LeetCode Release'
+              )}
             </button>
           </form>
         </div>
@@ -238,7 +368,7 @@ const styles = {
   },
   header: {
     color: '#ffffff',
-    fontSize: 26,
+    fontSize: 24,
     borderBottom: '1px solid rgba(255,255,255,0.06)',
     paddingBottom: 20,
     marginBottom: 10,
@@ -249,7 +379,7 @@ const styles = {
   },
   formCard: {
     width: '100%',
-    maxWidth: 580,
+    maxWidth: 720,
   },
   sectionHeader: {
     fontSize: 18,
@@ -261,11 +391,11 @@ const styles = {
   },
   toggleContainer: {
     display: 'flex',
-    gap: 10,
+    gap: 8,
     marginBottom: 24,
     background: 'rgba(255,255,255,0.02)',
     padding: 6,
-    borderRadius: 8,
+    borderRadius: 10,
     border: '1px solid rgba(255,255,255,0.05)',
   },
   toggleBtn: {
@@ -273,7 +403,7 @@ const styles = {
     background: 'none',
     border: 'none',
     color: '#9ca3af',
-    padding: '10px 16px',
+    padding: '10px 12px',
     borderRadius: 6,
     cursor: 'pointer',
     fontWeight: 'bold',
@@ -282,10 +412,21 @@ const styles = {
   },
   toggleBtnActive: {
     flex: 1,
-    background: 'rgba(59, 130, 246, 0.12)',
-    border: '1px solid rgba(59, 130, 246, 0.25)',
+    background: 'rgba(59, 130, 246, 0.15)',
+    border: '1px solid rgba(59, 130, 246, 0.3)',
     color: '#3b82f6',
-    padding: '10px 16px',
+    padding: '10px 12px',
+    borderRadius: 6,
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  toggleBtnActivePurple: {
+    flex: 1,
+    background: 'rgba(168, 85, 247, 0.15)',
+    border: '1px solid rgba(168, 85, 247, 0.3)',
+    color: '#c084fc',
+    padding: '10px 12px',
     borderRadius: 6,
     cursor: 'pointer',
     fontWeight: 'bold',
@@ -305,5 +446,22 @@ const styles = {
     fontSize: 13,
     color: '#d1d5db',
     fontWeight: 'bold',
+  },
+  bulkGrid: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
+    maxHeight: 400,
+    overflowY: 'auto',
+    paddingRight: 6,
+  },
+  bulkRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    background: 'rgba(255,255,255,0.02)',
+    padding: 8,
+    borderRadius: 8,
+    border: '1px solid rgba(255,255,255,0.04)',
   }
 };

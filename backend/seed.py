@@ -115,16 +115,38 @@ def seed_db():
         graded_at=timezone.now() - timedelta(days=2)
     )
 
-    # 6. Create Leetcode Challenges & Submissions
-    challenges = [
-        LeetcodeChallenge(title="47. Permutations II", url="https://leetcode.com/problems/permutations-ii/description/", deadline=timezone.now() + timedelta(days=1)),
-        LeetcodeChallenge(title="46. Permutations", url="https://leetcode.com/problems/permutations/description/", deadline=timezone.now() - timedelta(hours=6)),
+    # 6. Create 10-Day Leetcode Challenges Roadmap & Submissions
+    today_date = timezone.now().date()
+    leetcode_data = [
+        ("1. Two Sum", "https://leetcode.com/problems/two-sum/", -2, 1),
+        ("9. Palindrome Number", "https://leetcode.com/problems/palindrome-number/", -1, 2),
+        ("46. Permutations", "https://leetcode.com/problems/permutations/description/", 0, 3), # Today (Day 3)
+        ("47. Permutations II", "https://leetcode.com/problems/permutations-ii/description/", 1, 4),
+        ("53. Maximum Subarray", "https://leetcode.com/problems/maximum-subarray/", 2, 5),
+        ("70. Climbing Stairs", "https://leetcode.com/problems/climbing-stairs/", 3, 6),
+        ("121. Best Time to Buy and Sell Stock", "https://leetcode.com/problems/best-time-to-buy-and-sell-stock/", 4, 7),
+        ("141. Linked List Cycle", "https://leetcode.com/problems/linked-list-cycle/", 5, 8),
+        ("206. Reverse Linked List", "https://leetcode.com/problems/reverse-linked-list/", 6, 9),
+        ("242. Valid Anagram", "https://leetcode.com/problems/valid-anagram/", 7, 10),
     ]
-    for c in challenges:
-        c.save()
 
-    LeetcodeSubmission.objects.create(challenge=challenges[0], student=student, submission_url="https://leetcode.com/problems/permutations-ii/submissions/123456789", status="completed")
-    LeetcodeSubmission.objects.create(challenge=challenges[1], student=student, submission_url="https://leetcode.com/problems/permutations/submissions/123456780", status="completed")
+    challenges = []
+    for title, url, day_offset, day_num in leetcode_data:
+        avail = today_date + timedelta(days=day_offset)
+        dl = timezone.make_aware(datetime.combine(avail, datetime.max.time().replace(microsecond=0)))
+        ch = LeetcodeChallenge.objects.create(
+            title=title,
+            url=url,
+            available_date=avail,
+            day_number=day_num,
+            deadline=dl
+        )
+        challenges.append(ch)
+
+    # Student completed Day 1 & Day 2
+    LeetcodeSubmission.objects.create(challenge=challenges[0], student=student, submission_url="https://leetcode.com/problems/two-sum/submissions/10001", status="completed")
+    LeetcodeSubmission.objects.create(challenge=challenges[1], student=student, submission_url="https://leetcode.com/problems/palindrome-number/submissions/10002", status="completed")
+
 
     # 7. Study Notes
     StudyNote.objects.create(

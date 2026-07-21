@@ -24,7 +24,7 @@ class BatchSerializer(serializers.ModelSerializer):
 
 
 class BatchEnrollmentSerializer(serializers.ModelSerializer):
-    student_name = serializers.CharField(source='student.get_full_name', read_only=True)
+    student_name = serializers.SerializerMethodField()
     student_email = serializers.CharField(source='student.email', read_only=True)
     student_roll = serializers.CharField(source='student.roll_number', read_only=True)
     batch_name = serializers.CharField(source='batch.name', read_only=True)
@@ -32,6 +32,10 @@ class BatchEnrollmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = BatchEnrollment
         fields = '__all__'
+
+    def get_student_name(self, obj):
+        full = obj.student.get_full_name()
+        return full.strip() if full and full.strip() else obj.student.username
 
 
 class TaskSerializer(serializers.ModelSerializer):
@@ -41,13 +45,17 @@ class TaskSerializer(serializers.ModelSerializer):
 
 
 class SubmissionSerializer(serializers.ModelSerializer):
-    student_name = serializers.CharField(source='student.get_full_name', read_only=True)
+    student_name = serializers.SerializerMethodField()
     student_roll = serializers.CharField(source='student.roll_number', read_only=True)
     task_title = serializers.CharField(source='task.title', read_only=True)
 
     class Meta:
         model = Submission
         fields = '__all__'
+
+    def get_student_name(self, obj):
+        full = obj.student.get_full_name()
+        return full.strip() if full and full.strip() else obj.student.username
 
 
 class LeetcodeChallengeSerializer(serializers.ModelSerializer):
@@ -63,11 +71,17 @@ class LeetcodeSubmissionSerializer(serializers.ModelSerializer):
 
 
 class StudyNoteSerializer(serializers.ModelSerializer):
-    uploaded_by_name = serializers.CharField(source='uploaded_by.get_full_name', read_only=True)
+    uploaded_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = StudyNote
         fields = '__all__'
+
+    def get_uploaded_by_name(self, obj):
+        if not obj.uploaded_by:
+            return 'System'
+        full = obj.uploaded_by.get_full_name()
+        return full.strip() if full and full.strip() else obj.uploaded_by.username
 
 
 class MockDriveResultSerializer(serializers.ModelSerializer):
@@ -77,21 +91,30 @@ class MockDriveResultSerializer(serializers.ModelSerializer):
 
 
 class AttendanceLogSerializer(serializers.ModelSerializer):
-    student_name = serializers.CharField(source='student.get_full_name', read_only=True)
+    student_name = serializers.SerializerMethodField()
     student_roll = serializers.CharField(source='student.roll_number', read_only=True)
 
     class Meta:
         model = AttendanceLog
         fields = '__all__'
 
+    def get_student_name(self, obj):
+        full = obj.student.get_full_name()
+        return full.strip() if full and full.strip() else obj.student.username
+
 
 class LeaveRequestSerializer(serializers.ModelSerializer):
-    student_name = serializers.CharField(source='student.get_full_name', read_only=True)
+    student_name = serializers.SerializerMethodField()
     student_roll = serializers.CharField(source='student.roll_number', read_only=True)
 
     class Meta:
         model = LeaveRequest
         fields = '__all__'
+
+    def get_student_name(self, obj):
+        full = obj.student.get_full_name()
+        return full.strip() if full and full.strip() else obj.student.username
+
 
 
 class ChatMessageSerializer(serializers.ModelSerializer):

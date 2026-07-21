@@ -26,6 +26,18 @@ def get_student_batch(student):
     enrollment = BatchEnrollment.objects.filter(student=student, status='approved').first()
     return enrollment.batch if enrollment else None
 
+def update_user_last_seen(user):
+    if not user or not user.is_authenticated:
+        return
+    now = timezone.now()
+    if not user.last_seen or (now - user.last_seen).total_seconds() > 60:
+        user.last_seen = now
+        user.save(update_fields=['last_seen'])
+
+def get_online_student_count():
+    five_mins_ago = timezone.now() - timedelta(minutes=5)
+    return User.objects.filter(role='student', last_seen__gte=five_mins_ago).count()
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_student(request):
@@ -319,23 +331,44 @@ def student_tasks(request):
 @permission_classes([IsAuthenticated])
 def student_leetcode(request):
     user = request.user
+    update_user_last_seen(user)
+    today = timezone.now().date()
     
     if request.method == 'GET':
-        challenges = LeetcodeChallenge.objects.all().order_by('-deadline')
+        challenges = LeetcodeChallenge.objects.all().order_by('available_date', 'day_number')
+        challenge_ids = [ch.id for ch in challenges]
+        
+        # Single query lookup for all student submissions (Scalable for 200+ users)
+        submissions_dict = {
+            sub.challenge_id: sub 
+            for sub in LeetcodeSubmission.objects.filter(student=user, challenge_id__in=challenge_ids)
+        }
+        
         serialized = []
+        solved_count = 0
         for ch in challenges:
-            sub = LeetcodeSubmission.objects.filter(challenge=ch, student=user).first()
+            is_unlocked = ch.available_date <= today
+            sub = submissions_dict.get(ch.id)
+            if sub and sub.status == 'completed':
+                solved_count += 1
+            
             serialized.append({
                 'id': ch.id,
                 'title': ch.title,
-                'url': ch.url,
+                'url': ch.url if is_unlocked else None, # Redact link if future locked day
+                'available_date': ch.available_date,
+                'day_number': ch.day_number,
                 'deadline': ch.deadline,
+                'is_unlocked': is_unlocked,
+                'is_today': ch.available_date == today,
                 'submission': LeetcodeSubmissionSerializer(sub).data if sub else None
             })
+        
         return Response({
             'challenges': serialized,
-            'streak': 12, # Static placeholder for student metrics
-            'solved': LeetcodeSubmission.objects.filter(student=user).count()
+            'streak': min(solved_count * 2, 30) if solved_count > 0 else 0,
+            'solved': solved_count,
+            'onlineStudents': get_online_student_count()
         })
 
     elif request.method == 'POST':
@@ -350,12 +383,27 @@ def student_leetcode(request):
         except LeetcodeChallenge.DoesNotExist:
             return Response({'error': 'Challenge not found'}, status=status.HTTP_404_NOT_FOUND)
 
+        if ch.available_date > today:
+            return Response({'error': 'This challenge is locked and will open on its scheduled day.'}, status=status.HTTP_403_FORBIDDEN)
+
         sub, created = LeetcodeSubmission.objects.get_or_create(challenge=ch, student=user, defaults={'submission_url': submission_url})
         if not created:
             sub.submission_url = submission_url
             sub.save()
 
         return Response(LeetcodeSubmissionSerializer(sub).data)
+
+
+@api_view(['GET', 'POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def student_heartbeat(request):
+    update_user_last_seen(request.user)
+    return Response({
+        'onlineStudents': get_online_student_count(),
+        'status': 'active'
+    })
+
 
 
 @api_view(['GET'])
@@ -511,19 +559,21 @@ def admin_pending_students(request):
         return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
 
     # Fetch batch enrollments that are pending
-    pending_enrollments = BatchEnrollment.objects.filter(status='pending')
+    pending_enrollments = BatchEnrollment.objects.filter(status='pending').select_related('student', 'batch')
     
-    # Also fetch all students who have NO enrollment at all
-    students_with_enr = BatchEnrollment.objects.all().values_list('student_id', flat=True)
-    unassigned_students = User.objects.filter(role='student').exclude(id__in=students_with_enr)
+    # Students who have NO approved or pending enrollment
+    active_student_ids = BatchEnrollment.objects.filter(status__in=['approved', 'pending']).values_list('student_id', flat=True)
+    unassigned_students = User.objects.filter(role='student').exclude(id__in=active_student_ids)
 
     unassigned_data = []
     for s in unassigned_students:
+        full_name = s.get_full_name().strip() if s.get_full_name() else s.username
         unassigned_data.append({
             'id': s.id,
-            'student_name': s.get_full_name() or s.username,
+            'student': s.id,
+            'student_name': full_name or s.username,
             'student_email': s.email,
-            'student_roll': s.roll_number,
+            'student_roll': s.roll_number or 'N/A',
             'status': 'unassigned',
             'batch_name': 'None Allocated'
         })
@@ -559,6 +609,9 @@ def admin_allocate_batch(request):
     except (User.DoesNotExist, Batch.DoesNotExist):
         return Response({'error': 'Student or Batch not found'}, status=status.HTTP_404_NOT_FOUND)
 
+    # Clean up existing non-matching enrollments for student
+    BatchEnrollment.objects.filter(student=student).exclude(batch=batch).delete()
+
     enrollment, created = BatchEnrollment.objects.get_or_create(
         student=student, 
         batch=batch, 
@@ -568,7 +621,9 @@ def admin_allocate_batch(request):
         enrollment.status = action
         enrollment.save()
 
-    return Response({'status': f'Student allocated to {batch.name} successfully.'})
+    status_msg = f'Student {student.get_full_name() or student.username} allocated to {batch.name} successfully ({action}).'
+    return Response({'status': status_msg})
+
 
 
 @api_view(['POST'])
@@ -719,12 +774,14 @@ def admin_dashboard_stats(request):
     active_batches = Batch.objects.count()
     pending_leaves = LeaveRequest.objects.filter(status='pending').count()
     pending_grades = Submission.objects.filter(grade__isnull=True).count()
+    online_students = get_online_student_count()
 
     return Response({
         'totalStudents': total_students,
         'activeBatches': active_batches,
         'pendingLeaves': pending_leaves,
-        'pendingGrades': pending_grades
+        'pendingGrades': pending_grades,
+        'onlineStudents': online_students
     })
 
 
@@ -748,6 +805,8 @@ def admin_create_leetcode_challenge(request):
     title = request.data.get('title')
     url = request.data.get('url')
     deadline = request.data.get('deadline')
+    day_number = request.data.get('dayNumber', 1)
+    available_date_str = request.data.get('availableDate')
 
     if not title or not url or not deadline:
         return Response({'error': 'Title, URL, and deadline are required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -755,16 +814,67 @@ def admin_create_leetcode_challenge(request):
     try:
         parsed_date = datetime.strptime(deadline, "%Y-%m-%d")
         aware_deadline = timezone.make_aware(parsed_date.replace(hour=23, minute=59, second=59))
+        avail_date = datetime.strptime(available_date_str, "%Y-%m-%d").date() if available_date_str else timezone.now().date()
     except ValueError:
         return Response({'error': 'Invalid date format, use YYYY-MM-DD'}, status=status.HTTP_400_BAD_REQUEST)
 
     challenge = LeetcodeChallenge.objects.create(
         title=title,
         url=url,
+        day_number=day_number,
+        available_date=avail_date,
         deadline=aware_deadline
     )
 
     return Response({'status': 'Leetcode challenge created successfully', 'id': challenge.id})
+
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_bulk_create_leetcode(request):
+    try:
+        verify_admin(request.user)
+    except PermissionError as e:
+        return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
+
+    challenges_data = request.data.get('challenges', [])
+    start_date_str = request.data.get('startDate')
+
+    if not challenges_data:
+        return Response({'error': 'No challenges provided for 10-day bulk schedule.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        base_start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date() if start_date_str else timezone.now().date()
+    except ValueError:
+        base_start_date = timezone.now().date()
+
+    created_ids = []
+    for idx, item in enumerate(challenges_data):
+        title = item.get('title')
+        url = item.get('url')
+        day_num = item.get('dayNumber') or (idx + 1)
+        
+        if not title or not url:
+            continue
+
+        avail_date = base_start_date + timedelta(days=idx)
+        deadline_date = timezone.make_aware(datetime.combine(avail_date, datetime.max.time().replace(microsecond=0)))
+
+        ch = LeetcodeChallenge.objects.create(
+            title=title,
+            url=url,
+            day_number=day_num,
+            available_date=avail_date,
+            deadline=deadline_date
+        )
+        created_ids.append(ch.id)
+
+    return Response({
+        'status': f'Successfully scheduled {len(created_ids)} LeetCode challenges for 10-day release cycle.',
+        'count': len(created_ids)
+    }, status=status.HTTP_201_CREATED)
+
 
 
 @api_view(['POST'])
@@ -790,4 +900,410 @@ def admin_create_batch(request):
         'status': 'Batch created successfully.',
         'batch': BatchSerializer(batch).data
     }, status=status.HTTP_201_CREATED)
+
+
+# ==========================================
+# ADMIN EXTENDED CRUD ENDPOINTS
+# ==========================================
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_create_study_note(request):
+    try:
+        verify_admin(request.user)
+    except PermissionError as e:
+        return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
+
+    title = request.data.get('title')
+    summary = request.data.get('summary', '')
+    category = request.data.get('category', 'global')
+    file_url = request.data.get('fileUrl')
+    batch_id = request.data.get('batchId')
+
+    if not title or not file_url:
+        return Response({'error': 'Title and File URL are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    batch = None
+    if category == 'batch-specific' and batch_id:
+        try:
+            batch = Batch.objects.get(id=batch_id)
+        except Batch.DoesNotExist:
+            return Response({'error': 'Batch not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    note = StudyNote.objects.create(
+        title=title,
+        summary=summary,
+        category=category,
+        file_url=file_url,
+        batch=batch,
+        uploaded_by=request.user
+    )
+    return Response(StudyNoteSerializer(note).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST', 'DELETE'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_delete_study_note(request):
+    try:
+        verify_admin(request.user)
+    except PermissionError as e:
+        return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
+
+    note_id = request.data.get('noteId')
+    if not note_id:
+        return Response({'error': 'Note ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        note = StudyNote.objects.get(id=note_id)
+        note.delete()
+        return Response({'status': 'Study note deleted successfully'})
+    except StudyNote.DoesNotExist:
+        return Response({'error': 'Study note not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_get_mock_results(request):
+    try:
+        verify_admin(request.user)
+    except PermissionError as e:
+        return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
+
+    results = MockDriveResult.objects.all().select_related('student').order_by('-date')
+    serialized = []
+    for r in results:
+        serialized.append({
+            'id': r.id,
+            'student_id': r.student.id,
+            'student_name': r.student.get_full_name() or r.student.username,
+            'student_roll': r.student.roll_number or 'N/A',
+            'test_name': r.test_name,
+            'aptitude_score': r.aptitude_score,
+            'tech_score': r.tech_score,
+            'coding_score': r.coding_score,
+            'tech_hr_score': r.tech_hr_score,
+            'hr_score': r.hr_score,
+            'total_score': r.total_score,
+            'grade': r.grade,
+            'date': r.date
+        })
+    return Response(serialized)
+
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_create_mock_result(request):
+    try:
+        verify_admin(request.user)
+    except PermissionError as e:
+        return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
+
+    student_id = request.data.get('studentId')
+    test_name = request.data.get('testName')
+    apt = int(request.data.get('aptitudeScore', 0))
+    tech = int(request.data.get('techScore', 0))
+    coding = int(request.data.get('codingScore', 0))
+    tech_hr = int(request.data.get('techHrScore', 0))
+    hr = int(request.data.get('hrScore', 0))
+    grade = request.data.get('grade', 'B')
+    test_date_str = request.data.get('date')
+
+    if not student_id or not test_name:
+        return Response({'error': 'Student ID and Test Name are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        student = User.objects.get(id=student_id)
+        test_date = datetime.strptime(test_date_str, "%Y-%m-%d").date() if test_date_str else timezone.now().date()
+    except User.DoesNotExist:
+        return Response({'error': 'Student not found'}, status=status.HTTP_404_NOT_FOUND)
+    except ValueError:
+        return Response({'error': 'Invalid date format, use YYYY-MM-DD'}, status=status.HTTP_400_BAD_REQUEST)
+
+    total = apt + tech + coding + tech_hr + hr
+    res = MockDriveResult.objects.create(
+        student=student,
+        test_name=test_name,
+        aptitude_score=apt,
+        tech_score=tech,
+        coding_score=coding,
+        tech_hr_score=tech_hr,
+        hr_score=hr,
+        total_score=total,
+        grade=grade,
+        date=test_date
+    )
+    return Response({'status': 'Mock Drive Result created successfully', 'id': res.id}, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_create_company(request):
+    try:
+        verify_admin(request.user)
+    except PermissionError as e:
+        return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
+
+    name = request.data.get('name')
+    description = request.data.get('description', '')
+    logo_url = request.data.get('logoUrl', '')
+
+    if not name:
+        return Response({'error': 'Company name is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    company = PlacementCompany.objects.create(name=name, description=description, logo_url=logo_url)
+    return Response(PlacementCompanySerializer(company).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_create_placement_round(request):
+    try:
+        verify_admin(request.user)
+    except PermissionError as e:
+        return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
+
+    company_id = request.data.get('companyId')
+    title = request.data.get('title')
+    round_num = request.data.get('roundNum', 1)
+    description = request.data.get('description', '')
+
+    if not company_id or not title:
+        return Response({'error': 'Company ID and Round Title are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        company = PlacementCompany.objects.get(id=company_id)
+    except PlacementCompany.DoesNotExist:
+        return Response({'error': 'Placement Company not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    p_round = PlacementRound.objects.create(company=company, round_num=round_num, title=title, description=description)
+    return Response(PlacementRoundSerializer(p_round).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_create_placement_resource(request):
+    try:
+        verify_admin(request.user)
+    except PermissionError as e:
+        return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
+
+    round_id = request.data.get('roundId')
+    title = request.data.get('title')
+    file_url = request.data.get('fileUrl', '')
+    sample_questions = request.data.get('sampleQuestions', '')
+
+    if not round_id or not title:
+        return Response({'error': 'Round ID and Resource Title are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        p_round = PlacementRound.objects.get(id=round_id)
+    except PlacementRound.DoesNotExist:
+        return Response({'error': 'Placement Round not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    resource = PlacementResource.objects.create(placement_round=p_round, title=title, file_url=file_url, sample_questions=sample_questions)
+    return Response(PlacementResourceSerializer(resource).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_get_users(request):
+    try:
+        verify_admin(request.user)
+    except PermissionError as e:
+        return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
+
+    users = User.objects.all().order_by('-date_joined')
+    serialized = []
+    for u in users:
+        batch = get_student_batch(u)
+        serialized.append({
+            'id': u.id,
+            'username': u.username,
+            'email': u.email,
+            'full_name': u.get_full_name() or u.username,
+            'roll_number': u.roll_number or 'N/A',
+            'phone_number': u.phone_number or 'N/A',
+            'role': u.role,
+            'batch': batch.name if batch else 'Unassigned',
+            'last_seen': u.last_seen
+        })
+    return Response(serialized)
+
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_create_student(request):
+    try:
+        verify_admin(request.user)
+    except PermissionError as e:
+        return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
+
+    email = request.data.get('email')
+    password = request.data.get('password', 'password123')
+    first_name = request.data.get('firstName', '')
+    last_name = request.data.get('lastName', '')
+    roll_number = request.data.get('rollNumber', '')
+    phone_number = request.data.get('phoneNumber', '')
+    role = request.data.get('role', 'student')
+    batch_id = request.data.get('batchId')
+
+    if not email:
+        return Response({'error': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if User.objects.filter(username=email).exists():
+        return Response({'error': 'User with this email already exists'}, status=status.HTTP_400_BAD_REQUEST)
+
+    user = User.objects.create_user(
+        username=email,
+        email=email,
+        password=password,
+        first_name=first_name,
+        last_name=last_name,
+        roll_number=roll_number,
+        phone_number=phone_number,
+        role=role
+    )
+
+    if batch_id and role == 'student':
+        try:
+            batch = Batch.objects.get(id=batch_id)
+            BatchEnrollment.objects.create(student=user, batch=batch, status='approved')
+        except Batch.DoesNotExist:
+            pass
+
+    return Response({
+        'status': f'User {email} created successfully.',
+        'user': UserSerializer(user).data
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['PUT', 'DELETE'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_manage_batch(request, batch_id):
+    try:
+        verify_admin(request.user)
+    except PermissionError as e:
+        return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        batch = Batch.objects.get(id=batch_id)
+    except Batch.DoesNotExist:
+        return Response({'error': 'Batch not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'DELETE':
+        batch_name = batch.name
+        batch.delete()
+        return Response({'status': f'Batch {batch_name} deleted successfully'})
+
+    elif request.method == 'PUT':
+        name = request.data.get('name')
+        description = request.data.get('description', batch.description)
+        if name:
+            batch.name = name
+        batch.description = description
+        batch.save()
+        return Response({'status': 'Batch updated successfully', 'batch': BatchSerializer(batch).data})
+
+
+@api_view(['PUT', 'DELETE'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_manage_user(request, user_id):
+    try:
+        verify_admin(request.user)
+    except PermissionError as e:
+        return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'DELETE':
+        username = user.username
+        user.delete()
+        return Response({'status': f'User {username} deleted successfully'})
+
+    elif request.method == 'PUT':
+        user.first_name = request.data.get('firstName', user.first_name)
+        user.last_name = request.data.get('lastName', user.last_name)
+        user.roll_number = request.data.get('rollNumber', user.roll_number)
+        user.phone_number = request.data.get('phoneNumber', user.phone_number)
+        if 'role' in request.data:
+            user.role = request.data['role']
+        if 'password' in request.data and request.data['password']:
+            user.set_password(request.data['password'])
+        user.save()
+
+        batch_id = request.data.get('batchId')
+        if batch_id:
+            try:
+                batch = Batch.objects.get(id=batch_id)
+                BatchEnrollment.objects.filter(student=user).delete()
+                BatchEnrollment.objects.create(student=user, batch=batch, status='approved')
+            except Batch.DoesNotExist:
+                pass
+
+        return Response({'status': 'User profile updated successfully', 'user': UserSerializer(user).data})
+
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_remove_student_batch(request):
+    try:
+        verify_admin(request.user)
+    except PermissionError as e:
+        return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
+
+    student_id = request.data.get('studentId')
+    if not student_id:
+        return Response({'error': 'Student ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    deleted_count, _ = BatchEnrollment.objects.filter(student_id=student_id).delete()
+    return Response({'status': f'Student enrollment removed from batch ({deleted_count} record removed).'})
+
+
+@api_view(['PUT', 'DELETE'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_manage_task(request, task_id):
+    try:
+        verify_admin(request.user)
+    except PermissionError as e:
+        return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        task = Task.objects.get(id=task_id)
+    except Task.DoesNotExist:
+        return Response({'error': 'Task not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'DELETE':
+        title = task.title
+        task.delete()
+        return Response({'status': f'Task "{title}" deleted successfully'})
+
+    elif request.method == 'PUT':
+        task.title = request.data.get('title', task.title)
+        task.description = request.data.get('description', task.description)
+        due_date_str = request.data.get('dueDate')
+        if due_date_str:
+            try:
+                task.due_date = datetime.strptime(due_date_str, "%Y-%m-%d").date()
+            except ValueError:
+                pass
+        task.save()
+        return Response({'status': 'Task updated successfully', 'task': TaskSerializer(task).data})
+
+
 

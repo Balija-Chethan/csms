@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, BookOpen, ClipboardList, ShieldAlert } from 'lucide-react';
+import { Users, BookOpen, ClipboardList, ShieldAlert, Activity } from 'lucide-react';
 
 export default function AdminDashboard({ API_URL, token }) {
   const [stats, setStats] = useState(null);
@@ -40,6 +40,16 @@ export default function AdminDashboard({ API_URL, token }) {
           </div>
         </div>
 
+        <div className="glass-card glow-card-blue" style={styles.card}>
+          <Activity size={32} style={{ color: '#38bdf8' }} />
+          <div>
+            <div style={styles.statVal}>
+              <span className="live-dot-inline"></span> {stats.onlineStudents || 1}
+            </div>
+            <div style={styles.statLabel}>Live Online Students</div>
+          </div>
+        </div>
+
         <div className="glass-card" style={styles.card}>
           <BookOpen size={32} style={{ color: '#10b981' }} />
           <div>
@@ -64,6 +74,7 @@ export default function AdminDashboard({ API_URL, token }) {
           </div>
         </div>
       </div>
+
 
       <div className="glass-card" style={styles.infoBanner}>
         <h3>College Portal Administrator Rules</h3>

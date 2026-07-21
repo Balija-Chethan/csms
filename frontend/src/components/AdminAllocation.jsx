@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, CheckCircle, XCircle, BookOpen } from 'lucide-react';
+import { Users, CheckCircle, XCircle, BookOpen, Trash2, Edit2, UserX } from 'lucide-react';
 
 export default function AdminAllocation({ API_URL, token }) {
   const [data, setData] = useState({ pending: [], unassigned: [], batches: [] });
@@ -11,6 +11,40 @@ export default function AdminAllocation({ API_URL, token }) {
   const [newBatchName, setNewBatchName] = useState('');
   const [newBatchDesc, setNewBatchDesc] = useState('');
   const [creatingBatch, setCreatingBatch] = useState(false);
+
+  // Edit batch state
+  const [editingBatchId, setEditingBatchId] = useState(null);
+  const [editBatchName, setEditBatchName] = useState('');
+  const [editBatchDesc, setEditBatchDesc] = useState('');
+
+  const fetchAllocationData = async () => {
+    try {
+      const res = await fetch(`${API_URL}/admin/pending-students/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const resData = await res.json();
+      setData(resData);
+      
+      if (resData.batches.length > 0) {
+        const initialSelected = {};
+        resData.unassigned.forEach(s => {
+          initialSelected[s.id] = resData.batches[0].id;
+        });
+        resData.pending.forEach(s => {
+          initialSelected[s.student] = s.batch;
+        });
+        setSelectedBatch(initialSelected);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAllocationData();
+  }, []);
 
   const handleCreateBatch = async (e) => {
     e.preventDefault();
@@ -43,38 +77,50 @@ export default function AdminAllocation({ API_URL, token }) {
     }
   };
 
-  const fetchAllocationData = async () => {
+  const handleUpdateBatch = async (batchId) => {
+    if (!editBatchName.trim()) return;
     try {
-      const res = await fetch(`${API_URL}/admin/pending-students/`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+      const res = await fetch(`${API_URL}/admin/batch/${batchId}/`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ name: editBatchName.trim(), description: editBatchDesc.trim() })
       });
       const resData = await res.json();
-      setData(resData);
-      
-      // Pre-select first batch for each student
-      if (resData.batches.length > 0) {
-        const initialSelected = {};
-        resData.unassigned.forEach(s => {
-          initialSelected[s.id] = resData.batches[0].id;
-        });
-        resData.pending.forEach(s => {
-          initialSelected[s.student] = s.batch;
-        });
-        setSelectedBatch(initialSelected);
-      }
+      if (!res.ok) throw new Error(resData.error);
+
+      alert(resData.status || 'Batch updated successfully!');
+      setEditingBatchId(null);
+      fetchAllocationData();
     } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
+      alert(err.message);
     }
   };
 
-  useEffect(() => {
-    fetchAllocationData();
-  }, []);
+  const handleDeleteBatch = async (batchId, batchName) => {
+    if (!window.confirm(`Are you sure you want to delete batch "${batchName}"? This will unassign students in this batch.`)) return;
+
+    try {
+      const res = await fetch(`${API_URL}/admin/batch/${batchId}/`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error);
+
+      alert(resData.status || 'Batch deleted successfully!');
+      fetchAllocationData();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
 
   const handleAllocate = async (studentId, batchId, action = 'approved') => {
-    if (!batchId) return alert('Please select a batch first');
+    const defaultBatchId = data.batches.length > 0 ? data.batches[0].id : null;
+    const finalBatchId = batchId || selectedBatch[studentId] || defaultBatchId;
+    if (!finalBatchId) return alert('Please select or create a batch first');
     
     setAllocating(prev => ({ ...prev, [studentId]: true }));
     try {
@@ -84,7 +130,7 @@ export default function AdminAllocation({ API_URL, token }) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ studentId, batchId, action })
+        body: JSON.stringify({ studentId, batchId: finalBatchId, action })
       });
       const resData = await res.json();
       if (!res.ok) throw new Error(resData.error);
@@ -98,17 +144,39 @@ export default function AdminAllocation({ API_URL, token }) {
     }
   };
 
-  if (loading) return <div style={{ color: '#fff' }}>Loading pending allocation list...</div>;
+  const handleRemoveStudentFromBatch = async (studentId) => {
+    if (!window.confirm('Are you sure you want to remove this student from their batch?')) return;
+
+    try {
+      const res = await fetch(`${API_URL}/admin/remove-student-batch/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ studentId })
+      });
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error);
+
+      alert(resData.status);
+      fetchAllocationData();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  if (loading) return <div style={{ color: '#fff', padding: 24 }}>Loading pending allocation list...</div>;
 
   const allStudents = [...data.pending, ...data.unassigned];
 
   return (
     <div style={styles.container}>
       <h2 style={styles.header}>
-        <Users size={28} style={{ color: '#3b82f6' }} /> Student Batch Allocation
+        <Users size={28} style={{ color: '#3b82f6' }} /> Student Batch Allocation & Batch Management
       </h2>
       <p style={styles.subheader}>
-        Allocate registered student accounts to their course batches. Students cannot view training panels until allocated.
+        Define training batches, edit/delete batches, and allocate registered student accounts.
       </p>
 
       {/* Create New Batch Card */}
@@ -147,6 +215,51 @@ export default function AdminAllocation({ API_URL, token }) {
         </form>
       </div>
 
+      {/* Existing Batches List with Edit/Delete */}
+      {data.batches.length > 0 && (
+        <div className="glass-card" style={{ padding: 20 }}>
+          <h3 style={{ color: '#fff', fontSize: 16, marginBottom: 12 }}>Active Training Batches ({data.batches.length})</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+            {data.batches.map(b => (
+              <div key={b.id} style={{ background: 'rgba(0,0,0,0.25)', padding: 14, borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
+                {editingBatchId === b.id ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <input type="text" className="custom-input" value={editBatchName} onChange={e => setEditBatchName(e.target.value)} />
+                    <input type="text" className="custom-input" value={editBatchDesc} onChange={e => setEditBatchDesc(e.target.value)} placeholder="Description" />
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button className="btn-primary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => handleUpdateBatch(b.id)}>Save</button>
+                      <button className="btn-secondary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => setEditingBatchId(null)}>Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <div style={{ color: '#60a5fa', fontWeight: 'bold', fontSize: 15 }}>{b.name}</div>
+                      <div style={{ color: '#9ca3af', fontSize: 12, marginTop: 2 }}>{b.description || 'No description'}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button 
+                        onClick={() => { setEditingBatchId(b.id); setEditBatchName(b.name); setEditBatchDesc(b.description || ''); }} 
+                        style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: 2 }}
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteBatch(b.id, b.name)} 
+                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 2 }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Allocation Table */}
       {allStudents.length === 0 ? (
         <div className="glass-card" style={{ padding: 32, textAlign: 'center' }}>
           <h3>No students awaiting allocation</h3>
@@ -168,6 +281,7 @@ export default function AdminAllocation({ API_URL, token }) {
             <tbody>
               {allStudents.map(student => {
                 const sId = student.student || student.id;
+                const defaultBId = data.batches.length > 0 ? data.batches[0].id : '';
                 return (
                   <tr key={sId} style={styles.tr}>
                     <td style={{ ...styles.td, fontWeight: 'bold' }}>{student.student_roll || 'N/A'}</td>
@@ -183,7 +297,7 @@ export default function AdminAllocation({ API_URL, token }) {
                     <td style={styles.td}>
                       <select 
                         className="custom-input" 
-                        value={selectedBatch[sId] || ''}
+                        value={selectedBatch[sId] || defaultBId}
                         onChange={e => setSelectedBatch(prev => ({ ...prev, [sId]: e.target.value }))}
                         style={{ width: 180, height: 38, padding: '4px 12px' }}
                       >
@@ -202,16 +316,14 @@ export default function AdminAllocation({ API_URL, token }) {
                         >
                           <CheckCircle size={14} /> Approve
                         </button>
-                        {student.status === 'pending' && (
-                          <button 
-                            className="btn-secondary" 
-                            style={{ padding: '8px 12px', fontSize: 13, borderColor: '#ef4444', color: '#ef4444' }}
-                            onClick={() => handleAllocate(sId, selectedBatch[sId], 'rejected')}
-                            disabled={allocating[sId]}
-                          >
-                            <XCircle size={14} /> Reject
-                          </button>
-                        )}
+
+                        <button 
+                          className="btn-secondary" 
+                          style={{ padding: '8px 12px', fontSize: 13, borderColor: 'rgba(255,255,255,0.2)', color: '#9ca3af' }}
+                          onClick={() => handleRemoveStudentFromBatch(sId)}
+                        >
+                          <UserX size={14} /> Unassign
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -244,6 +356,22 @@ const styles = {
     paddingBottom: 20,
     marginTop: -8,
   },
+  createCard: {
+    padding: 24,
+  },
+  formInline: {
+    display: 'flex',
+    gap: 16,
+    alignItems: 'flex-start',
+    flexWrap: 'wrap',
+  },
+  formGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+    flex: 1,
+    minWidth: 200,
+  },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
@@ -267,23 +395,5 @@ const styles = {
     padding: '16px 20px',
     fontSize: 14,
     color: '#e5e7eb',
-    verticalAlign: 'middle',
-  },
-  createCard: {
-    padding: 24,
-    marginBottom: 8,
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  formInline: {
-    display: 'flex',
-    gap: 16,
-    flexWrap: 'wrap',
-    alignItems: 'center',
-  },
-  formGroup: {
-    flex: 1,
-    minWidth: 200,
-    display: 'flex',
   }
 };
