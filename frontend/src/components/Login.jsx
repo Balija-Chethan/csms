@@ -89,8 +89,13 @@ export default function Login({ setAuth, API_URL }) {
   return (
     <div style={styles.container}>
       {/* Decorative animated cosmic background */}
-      <div className="cosmic-bg">
+      <div className="cosmic-bg" style={{
+        background: 'linear-gradient(rgba(11, 15, 25, 0.55), rgba(11, 15, 25, 0.8)), url("/mits_campus.jpg")',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center'
+      }}>
         <div className="aurora-wave"></div>
+
         <div className="blob blob-1"></div>
         <div className="blob blob-2"></div>
         <div className="blob blob-3"></div>
