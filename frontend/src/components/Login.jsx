@@ -349,11 +349,7 @@ const styles = {
   },
   rightPanel: {
     flex: 0.8,
-    background: 'rgba(11, 15, 25, 0.35)',
-    backdropFilter: 'blur(6px)',
-    WebkitBackdropFilter: 'blur(6px)',
-    borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
-    boxShadow: '-10px 0 30px rgba(0, 0, 0, 0.4)',
+    background: 'transparent',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -363,9 +359,10 @@ const styles = {
     zIndex: 2,
     '@media (max-width: 900px)': {
       flex: 1,
-      background: 'rgba(11, 15, 25, 0.65)',
+      background: 'transparent',
     }
   },
+
 
   formCard: {
     width: '100%',
