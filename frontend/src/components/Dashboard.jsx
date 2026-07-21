@@ -237,7 +237,7 @@ export default function Dashboard({ data, refreshData, API_URL, token, setActive
             <span style={styles.widgetSub}>{attendance.totalDays} Days Tracked</span>
           </div>
           <div style={styles.insightsContent}>
-            <div style={styles.largeRank} style={{ fontSize: 36, color: '#10b981', textAlign: 'center', margin: '12px 0' }}>
+            <div style={{ ...styles.largeRank, fontSize: 36, color: '#10b981', textAlign: 'center', margin: '12px 0' }}>
               {attendance.rate}%
             </div>
             <div style={styles.insightRow}>
