@@ -340,7 +340,7 @@ export default function App() {
                   Dashboard
                 </button>
 
-                {dashboardData.status === 'allocated' && (
+                {dashboardData?.status === 'allocated' && (
                   <>
                     {/* Learning Submenu */}
                     <div>
@@ -439,7 +439,7 @@ export default function App() {
 
                   {accountOpen && (
                     <div style={styles.submenuItems}>
-                      {dashboardData.status === 'allocated' && (
+                      {dashboardData?.status === 'allocated' && (
                         <button 
                           style={activeTab === 'leaves' ? styles.subItemActive : styles.subItem}
                           onClick={() => setActiveTab('leaves')}
