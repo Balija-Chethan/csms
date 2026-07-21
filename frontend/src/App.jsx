@@ -34,7 +34,7 @@ import PendingApproval from './components/PendingApproval';
 import RejectedBatch from './components/RejectedBatch';
 import AdminPendingRequests from './components/AdminPendingRequests';
 
-const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api";
+const API_URL = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? "http://127.0.0.1:8000/api" : "/api");
 
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('csms_token'));
