@@ -1,4 +1,5 @@
 import os
+from django.db.models import Q
 from django.utils import timezone
 from datetime import date, datetime, timedelta
 from django.contrib.auth import authenticate
@@ -42,21 +43,23 @@ def get_online_student_count():
 @permission_classes([AllowAny])
 def register_student(request):
     data = request.data
-    email = data.get('email')
-    password = data.get('password')
+    raw_email = data.get('email', '')
+    password = data.get('password', '')
     first_name = data.get('firstName', '')
     last_name = data.get('lastName', '')
     roll_number = data.get('rollNumber', '')
     phone_number = data.get('phoneNumber', '')
 
-    if not email or not password:
+    if not raw_email or not password:
         return Response({'error': 'Email and password are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    email = raw_email.strip().lower()
 
     # Restore from mongo first to check existing accounts
     from api.mongo import get_mongo_db, restore_from_mongo, sync_to_mongo
     restore_from_mongo()
 
-    if User.objects.filter(username=email).exists() or User.objects.filter(email=email).exists():
+    if User.objects.filter(username__iexact=email).exists() or User.objects.filter(email__iexact=email).exists():
         return Response({'error': 'A user with this email already exists'}, status=status.HTTP_400_BAD_REQUEST)
 
     user = User.objects.create_user(
@@ -94,23 +97,25 @@ def register_student(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_student(request):
-    email = request.data.get('email')
-    password = request.data.get('password')
+    raw_email = request.data.get('email', '')
+    password = request.data.get('password', '')
 
-    if not email or not password:
+    if not raw_email or not password:
         return Response({'error': 'Email and password are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    email = raw_email.strip().lower()
 
     from api.mongo import restore_from_mongo
     restore_from_mongo()
 
-    user = authenticate(username=email, password=password)
-    if not user:
-        # Check by email in case username differs
-        existing = User.objects.filter(email=email).first()
-        if existing and existing.check_password(password):
-            user = existing
+    user = User.objects.filter(username__iexact=email).first() or User.objects.filter(email__iexact=email).first()
 
-    if not user:
+    if not user or not user.check_password(password):
+        user_auth = authenticate(username=email, password=password)
+        if user_auth:
+            user = user_auth
+
+    if not user or not user.check_password(password):
         return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
     token = generate_token(user)
@@ -162,11 +167,15 @@ def student_dashboard(request):
         })
 
     # 1. Tasks Completion Summary
-    tasks = Task.objects.filter(batch=batch)
+    tasks = Task.objects.filter(batch=batch) if batch else Task.objects.all()
+    if not tasks.exists():
+        tasks = Task.objects.all()
+
     total_tasks = tasks.count()
-    completed_submissions = Submission.objects.filter(student=user, task__batch=batch, grade__isnull=False).count()
-    pending_submissions = Submission.objects.filter(student=user, task__batch=batch, grade__isnull=True).count()
-    not_submitted = total_tasks - completed_submissions - pending_submissions
+    user_subs = Submission.objects.filter(student=user)
+    completed_submissions = user_subs.count()
+    pending_submissions = user_subs.filter(grade__isnull=True).count()
+    not_submitted = max(0, total_tasks - completed_submissions)
     completion_rate = round((completed_submissions / total_tasks) * 100) if total_tasks > 0 else 0
 
     # 2. Leaderboard Rank
@@ -313,14 +322,17 @@ def student_checkin(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def student_tasks(request):
+    from api.mongo import restore_from_mongo
+    restore_from_mongo()
+    
     user = request.user
     batch = get_student_batch(user)
-    
-    if not batch:
-        return Response({'error': 'No batch active'}, status=status.HTTP_400_BAD_REQUEST)
 
     if request.method == 'GET':
-        tasks = Task.objects.filter(batch=batch).order_by('-due_date')
+        tasks = Task.objects.filter(batch=batch).order_by('-due_date') if batch else Task.objects.none()
+        if not tasks.exists():
+            tasks = Task.objects.all().order_by('-due_date')
+
         serialized_tasks = []
         for task in tasks:
             sub = Submission.objects.filter(task=task, student=user).first()
@@ -328,7 +340,8 @@ def student_tasks(request):
                 'id': task.id,
                 'title': task.title,
                 'description': task.description,
-                'due_date': task.due_date,
+                'due_date': str(task.due_date),
+                'batch_name': task.batch.name if task.batch else 'General',
                 'submission': SubmissionSerializer(sub).data if sub else None
             })
         return Response(serialized_tasks)
@@ -341,9 +354,9 @@ def student_tasks(request):
             return Response({'error': 'Task ID and GitHub URL are required'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            task = Task.objects.get(id=task_id, batch=batch)
+            task = Task.objects.get(id=task_id)
         except Task.DoesNotExist:
-            return Response({'error': 'Task not found in this batch'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Task not found'}, status=status.HTTP_404_NOT_FOUND)
 
         sub, created = Submission.objects.get_or_create(task=task, student=user, defaults={'github_url': github_url})
         if not created:
@@ -357,15 +370,16 @@ def student_tasks(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def student_leetcode(request):
+    from api.mongo import restore_from_mongo
+    restore_from_mongo()
+
     user = request.user
     update_user_last_seen(user)
     
-    # Calculate active challenge date based on Asia/Kolkata (IST) 9 AM boundary (9 AM to 9 AM next day)
     try:
         from zoneinfo import ZoneInfo
         local_now = timezone.now().astimezone(ZoneInfo('Asia/Kolkata'))
     except Exception:
-        # Fallback to manual IST offset (+5.5 hours) if ZoneInfo is not supported
         local_now = timezone.now() + timedelta(hours=5.5)
         
     active_time = local_now - timedelta(hours=9)
@@ -376,16 +390,13 @@ def student_leetcode(request):
         challenges = LeetcodeChallenge.objects.all().order_by('available_date', 'day_number')
         challenge_ids = [ch.id for ch in challenges]
         
-        # Single query lookup for all student submissions (Scalable for 200+ users)
         submissions_dict = {
             sub.challenge_id: sub 
             for sub in LeetcodeSubmission.objects.filter(student=user, challenge_id__in=challenge_ids)
         }
         
-        # Calculate streak dynamically
-        # Retrieve all challenges released up to the current active_date
         past_challenges = [ch for ch in challenges if ch.available_date <= active_date]
-        past_challenges.reverse()  # Go backwards in time
+        past_challenges.reverse()
         
         streak = 0
         for ch in past_challenges:
@@ -393,16 +404,12 @@ def student_leetcode(request):
             has_solved = sub and sub.status == 'completed'
             
             if ch.available_date == active_date:
-                # If active challenge is solved, increment streak
-                # If not solved yet, do not break the streak since the day's window is still open
                 if has_solved:
                     streak += 1
             else:
-                # If past challenge was solved, increment streak
                 if has_solved:
                     streak += 1
                 else:
-                    # Missed past challenge = Streak is broken!
                     break
         
         serialized = []
@@ -411,22 +418,9 @@ def student_leetcode(request):
             sub = submissions_dict.get(ch.id)
             has_solved = sub and sub.status == 'completed'
             
-            # Visibility: 
-            # 1. Today's active challenge is visible.
-            # 2. Older challenges are ONLY visible if they were successfully solved.
-            # 3. Future challenges are locked and hidden.
             is_active = ch.available_date == active_date
-            is_past = ch.available_date < active_date
-            
-            if is_active:
-                is_unlocked = True
-                visible = True
-            elif is_past:
-                is_unlocked = True
-                visible = has_solved  # Hidden if missed/unsolved
-            else:
-                is_unlocked = False
-                visible = False
+            is_unlocked = True
+            visible = True
             
             if visible:
                 if has_solved:
@@ -507,9 +501,12 @@ def student_heartbeat(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def student_notes(request):
+    from api.mongo import restore_from_mongo
+    restore_from_mongo()
+
     user = request.user
     batch = get_student_batch(user)
-    notes = StudyNote.objects.filter(models.Q(batch=batch) | models.Q(category='global')).order_by('-date_shared')
+    notes = StudyNote.objects.filter(Q(batch=batch) | Q(category='global') | Q(batch__isnull=True)).order_by('-date_shared')
     return Response(StudyNoteSerializer(notes, many=True).data)
 
 
@@ -886,6 +883,9 @@ def admin_dashboard_stats(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def get_placement_prep(request):
+    from api.mongo import restore_from_mongo
+    restore_from_mongo()
+
     companies = PlacementCompany.objects.all().order_by('name')
     return Response(PlacementCompanySerializer(companies, many=True).data)
 
@@ -1401,6 +1401,145 @@ def admin_manage_task(request, task_id):
                 pass
         task.save()
         return Response({'status': 'Task updated successfully', 'task': TaskSerializer(task).data})
+
+
+# ==========================================
+# BATCH SELECTION & ADMIN APPROVAL ENDPOINTS
+# ==========================================
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_batches(request):
+    """List all available training batches with metadata and enrolled counts."""
+    from api.mongo import restore_from_mongo
+    restore_from_mongo()
+    batches = Batch.objects.all().order_by('name')
+    serializer = BatchSerializer(batches, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def request_batch_join(request):
+    """Student submits request to join a batch."""
+    student = request.user
+    if student.role != 'student':
+        return Response({'error': 'Only students can request batch enrollment'}, status=status.HTTP_403_FORBIDDEN)
+
+    batch_id = request.data.get('batch_id') or request.data.get('batchId')
+    if not batch_id:
+        return Response({'error': 'batch_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    batch = Batch.objects.filter(id=batch_id).first()
+    if not batch:
+        return Response({'error': 'Selected batch does not exist'}, status=status.HTTP_404_NOT_FOUND)
+
+    existing = BatchEnrollment.objects.filter(student=student).first()
+    if existing:
+        if existing.status == 'approved':
+            return Response({'error': 'You are already enrolled in an approved batch'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            existing.batch = batch
+            existing.status = 'pending'
+            existing.requested_at = timezone.now()
+            existing.approved_at = None
+            existing.approved_by = None
+            existing.save()
+            enrollment = existing
+    else:
+        enrollment = BatchEnrollment.objects.create(
+            student=student,
+            batch=batch,
+            status='pending'
+        )
+
+    return Response({
+        'message': 'Your request has been sent to the administrator for approval.',
+        'enrollment': BatchEnrollmentSerializer(enrollment).data
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def get_student_enrollment(request):
+    """Get the current student's enrollment status."""
+    student = request.user
+    enrollment = BatchEnrollment.objects.filter(student=student).order_by('-joined_at').first()
+
+    if not enrollment:
+        return Response({
+            'status': 'no_enrollment',
+            'enrollment': None,
+            'batch': None
+        }, status=status.HTTP_200_OK)
+
+    return Response({
+        'status': enrollment.status,
+        'enrollment': BatchEnrollmentSerializer(enrollment).data,
+        'batch': BatchSerializer(enrollment.batch).data if enrollment.batch else None
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_pending_batch_requests(request):
+    """Admin endpoint: Get all pending batch join requests."""
+    if request.user.role != 'admin':
+        return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
+
+    from api.mongo import restore_from_mongo
+    restore_from_mongo()
+
+    pending_requests = BatchEnrollment.objects.filter(status='pending').select_related('student', 'batch').order_by('-joined_at')
+    serializer = BatchEnrollmentSerializer(pending_requests, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_approve_batch_request(request, enrollment_id):
+    """Admin endpoint: Approve student batch request."""
+    if request.user.role != 'admin':
+        return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
+
+    enrollment = BatchEnrollment.objects.filter(id=enrollment_id).first()
+    if not enrollment:
+        return Response({'error': 'Enrollment request not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    enrollment.status = 'approved'
+    enrollment.approved_at = timezone.now()
+    enrollment.approved_by = request.user
+    enrollment.save()
+
+    return Response({
+        'message': f"Approved {enrollment.student.username} into {enrollment.batch.name}.",
+        'enrollment': BatchEnrollmentSerializer(enrollment).data
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_reject_batch_request(request, enrollment_id):
+    """Admin endpoint: Reject student batch request."""
+    if request.user.role != 'admin':
+        return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
+
+    enrollment = BatchEnrollment.objects.filter(id=enrollment_id).first()
+    if not enrollment:
+        return Response({'error': 'Enrollment request not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    enrollment.status = 'rejected'
+    enrollment.save()
+
+    return Response({
+        'message': f"Rejected batch request for {enrollment.student.username}.",
+        'enrollment': BatchEnrollmentSerializer(enrollment).data
+    }, status=status.HTTP_200_OK)
 
 
 

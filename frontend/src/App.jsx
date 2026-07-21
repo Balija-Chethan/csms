@@ -28,6 +28,12 @@ import AdminMockResults from './components/AdminMockResults';
 import AdminPlacementPrep from './components/AdminPlacementPrep';
 import AdminUsers from './components/AdminUsers';
 
+// Student Onboarding components
+import BatchSelection from './components/BatchSelection';
+import PendingApproval from './components/PendingApproval';
+import RejectedBatch from './components/RejectedBatch';
+import AdminPendingRequests from './components/AdminPendingRequests';
+
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api";
 
 export default function App() {
@@ -37,6 +43,31 @@ export default function App() {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [onlineStudents, setOnlineStudents] = useState(1);
+
+  const [enrollmentStatus, setEnrollmentStatus] = useState(null);
+  const [enrollmentData, setEnrollmentData] = useState(null);
+
+  const fetchEnrollmentStatus = async () => {
+    if (!token || !user || user.role === 'admin') return;
+    try {
+      const res = await fetch(`${API_URL}/student/enrollment/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setEnrollmentStatus(data.status);
+        setEnrollmentData(data.enrollment);
+      }
+    } catch (err) {
+      console.error("Error fetching enrollment status:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (token && user && user.role !== 'admin') {
+      fetchEnrollmentStatus();
+    }
+  }, [token, user]);
 
   // Periodic heartbeat for live activity tracking
   useEffect(() => {
@@ -216,6 +247,14 @@ export default function App() {
                 >
                   <LayoutDashboard size={18} />
                   Admin Workspace
+                </button>
+
+                <button 
+                  style={activeTab === 'admin_pending_requests' ? styles.navItemActive : styles.navItem}
+                  onClick={() => setActiveTab('admin_pending_requests')}
+                >
+                  <Clock size={18} />
+                  Pending Batch Requests
                 </button>
 
                 <button 
@@ -434,6 +473,7 @@ export default function App() {
               // ADMIN CONTENT ROUTING
               <>
                 {activeTab === 'admin_dashboard' && <AdminDashboard API_URL={API_URL} token={token} />}
+                {activeTab === 'admin_pending_requests' && <AdminPendingRequests API_URL={API_URL} token={token} />}
                 {activeTab === 'admin_allocation' && <AdminAllocation API_URL={API_URL} token={token} />}
                 {activeTab === 'admin_users' && <AdminUsers API_URL={API_URL} token={token} />}
                 {activeTab === 'admin_tasks' && <AdminTasks API_URL={API_URL} token={token} />}
@@ -448,20 +488,28 @@ export default function App() {
             ) : (
               // STUDENT CONTENT ROUTING
               <>
-                {dashboardData.status === 'awaiting_allocation' ? (
-                  <div className="glass-card" style={{ padding: 48, textAlign: 'center', maxWidth: 640, margin: '40px auto' }}>
-                    <Users size={48} style={{ color: '#f59e0b', marginBottom: 20 }} />
-                    <h2 style={{ marginBottom: 12 }}>Awaiting Batch Allocation</h2>
-                    <p style={{ color: '#9ca3af', lineHeight: 1.6 }}>
-                      Your CSMS account has been successfully registered! However, you have not been allocated to a training batch group yet.
-                    </p>
-                    <p style={{ color: '#9ca3af', marginTop: 12 }}>
-                      Please coordinate with your college administrator to approve your enrollment and assign you to a class batch (e.g. PYTHON-FSD) to unlock tasks, worksheets, and chat rooms.
-                    </p>
-                    <button className="btn-secondary" onClick={fetchDashboardData} style={{ marginTop: 24 }}>
-                      Check Status Refresh
-                    </button>
-                  </div>
+                {enrollmentStatus === 'no_enrollment' ? (
+                  <BatchSelection 
+                    API_URL={API_URL} 
+                    token={token} 
+                    onEnrollmentRequested={() => {
+                      fetchEnrollmentStatus();
+                      fetchDashboardData();
+                    }} 
+                  />
+                ) : enrollmentStatus === 'pending' ? (
+                  <PendingApproval 
+                    enrollment={enrollmentData} 
+                    onRefresh={() => {
+                      fetchEnrollmentStatus();
+                      fetchDashboardData();
+                    }} 
+                  />
+                ) : enrollmentStatus === 'rejected' ? (
+                  <RejectedBatch 
+                    enrollment={enrollmentData} 
+                    onChooseNewBatch={() => setEnrollmentStatus('no_enrollment')} 
+                  />
                 ) : (
                   <>
                     {activeTab === 'dashboard' && (
@@ -481,10 +529,10 @@ export default function App() {
                     {activeTab === 'leaderboard' && <Leaderboard API_URL={API_URL} token={token} />}
                     {activeTab === 'attendance' && <Attendance API_URL={API_URL} token={token} />}
                     {activeTab === 'leaves' && <Leaves API_URL={API_URL} token={token} />}
-                    {activeTab === 'chat' && <Chat API_URL={API_URL} token={token} batchName={dashboardData.batch.name} />}
+                    {activeTab === 'chat' && <Chat API_URL={API_URL} token={token} batchName={dashboardData?.batch?.name || "Batch"} />}
                     {activeTab === 'profile' && (
                       <Profile 
-                        studentData={dashboardData.student} 
+                        studentData={dashboardData?.student || user} 
                         token={token} 
                         API_URL={API_URL} 
                         refreshUserData={refreshUserData} 

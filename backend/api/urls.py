@@ -49,6 +49,14 @@ urlpatterns = [
     path('admin/user/<int:user_id>/', views.admin_manage_user, name='admin_manage_user'),
     path('admin/remove-student-batch/', views.admin_remove_student_batch, name='admin_remove_student_batch'),
     path('admin/task/<int:task_id>/', views.admin_manage_task, name='admin_manage_task'),
+
+    # Batch Selection & Onboarding Flow
+    path('batches/', views.get_batches, name='get_batches'),
+    path('batch/request/', views.request_batch_join, name='request_batch'),
+    path('student/enrollment/', views.get_student_enrollment, name='student_enrollment'),
+    path('admin/pending-requests/', views.admin_pending_batch_requests, name='admin_pending_requests'),
+    path('admin/approve/<int:enrollment_id>/', views.admin_approve_batch_request, name='admin_approve_request'),
+    path('admin/reject/<int:enrollment_id>/', views.admin_reject_batch_request, name='admin_reject_request'),
 ]
 
 

@@ -10,7 +10,7 @@ def get_mongo_db():
     if _mongo_db is None:
         uri = getattr(settings, 'MONGODB_URI', os.getenv('MONGODB_URI'))
         if not uri:
-            uri = "mongodb+srv://nichithasree2006_db_user:nishitha%40223@cluster0.jaxdilz.mongodb.net/csms_db?retryWrites=true&w=majority"
+            uri = "mongodb+srv://balija-chethan:Chethan%402107@cluster0.dvawyze.mongodb.net/csms_db?retryWrites=true&w=majority"
         
         try:
             _mongo_client = pymongo.MongoClient(uri, serverSelectionTimeoutMS=5000)
@@ -117,7 +117,12 @@ def restore_from_mongo():
                 continue
             existing = Batch.objects.filter(name=b_name).first()
             if not existing:
-                batch = Batch(name=b_name, description=b.get('description', ''))
+                batch = Batch(
+                    name=b_name,
+                    description=b.get('description', ''),
+                    trainer_name=b.get('trainer_name', 'Senior Instructor'),
+                    max_seats=b.get('max_seats', 60)
+                )
                 if str(raw_id).isdigit():
                     batch.id = int(raw_id)
                 batch.save()
@@ -132,10 +137,23 @@ def restore_from_mongo():
                 try:
                     student = User.objects.filter(id=student_id).first()
                     batch = Batch.objects.filter(id=batch_id).first()
-                    if student and batch and not BatchEnrollment.objects.filter(student=student, batch=batch).exists():
-                        enr = BatchEnrollment(student=student, batch=batch, status=e.get('status', 'approved'))
-                        if str(raw_id).isdigit():
-                            enr.id = int(raw_id)
+                    if student and batch:
+                        enr = BatchEnrollment.objects.filter(student=student, batch=batch).first()
+                        if not enr:
+                            enr = BatchEnrollment(
+                                student=student,
+                                batch=batch,
+                                status=e.get('status', 'pending')
+                            )
+                            if str(raw_id).isdigit():
+                                enr.id = int(raw_id)
+                        else:
+                            enr.status = e.get('status', 'pending')
+                        
+                        if e.get('approved_by_id'):
+                            approved_by_user = User.objects.filter(id=e.get('approved_by_id')).first()
+                            if approved_by_user:
+                                enr.approved_by = approved_by_user
                         enr.save()
                 except Exception:
                     pass
@@ -162,6 +180,119 @@ def restore_from_mongo():
                 except Exception:
                     pass
 
-        print(f"[MongoDB Auto-Restore] Verified and restored MongoDB state ({len(mongo_users)} users, {len(mongo_batches)} batches, {len(mongo_tasks)} tasks).")
+        # 5. Restore LeetcodeChallenges
+        mongo_challenges = list(db['leetcode_challenges'].find({}))
+        for lc in mongo_challenges:
+            raw_id = lc.get('_id') or lc.get('id')
+            title = lc.get('title')
+            url = lc.get('url')
+            if title and url:
+                try:
+                    if not LeetcodeChallenge.objects.filter(title=title).exists():
+                        avail_str = lc.get('available_date', str(date.today()))
+                        dead_str = lc.get('deadline', str(date.today() + timedelta(days=7)))
+                        try:
+                            parsed_avail = datetime.strptime(avail_str.split(' ')[0], "%Y-%m-%d").date()
+                        except Exception:
+                            parsed_avail = date.today()
+
+                        try:
+                            parsed_dead = timezone.make_aware(datetime.strptime(dead_str.split(' ')[0], "%Y-%m-%d").replace(hour=23, minute=59, second=59))
+                        except Exception:
+                            parsed_dead = timezone.now() + timedelta(days=7)
+
+                        ch = LeetcodeChallenge(
+                            title=title,
+                            url=url,
+                            day_number=lc.get('day_number', 1),
+                            available_date=parsed_avail,
+                            deadline=parsed_dead
+                        )
+                        if str(raw_id).isdigit():
+                            ch.id = int(raw_id)
+                        ch.save()
+                except Exception:
+                    pass
+
+        # 6. Restore StudyNotes
+        mongo_notes = list(db['study_notes'].find({}))
+        for n in mongo_notes:
+            raw_id = n.get('_id') or n.get('id')
+            title = n.get('title')
+            if title and not StudyNote.objects.filter(title=title).exists():
+                try:
+                    batch_id = n.get('batch_id')
+                    batch_obj = Batch.objects.filter(id=batch_id).first() if batch_id else None
+                    uploaded_by_id = n.get('uploaded_by_id')
+                    uploader = User.objects.filter(id=uploaded_by_id).first() if uploaded_by_id else None
+                    note = StudyNote(
+                        batch=batch_obj,
+                        title=title,
+                        summary=n.get('summary', ''),
+                        uploaded_by=uploader,
+                        category=n.get('category', 'global'),
+                        file_url=n.get('file_url', '')
+                    )
+                    if str(raw_id).isdigit():
+                        note.id = int(raw_id)
+                    note.save()
+                except Exception:
+                    pass
+
+        # 7. Restore Placement Prep (Companies, Rounds, Resources)
+        mongo_companies = list(db['placement_companies'].find({}))
+        for c in mongo_companies:
+            comp_name = c.get('name')
+            raw_c_id = c.get('_id') or c.get('id')
+            if comp_name:
+                company_obj = PlacementCompany.objects.filter(name=comp_name).first()
+                if not company_obj:
+                    company_obj = PlacementCompany(
+                        name=comp_name,
+                        description=c.get('description', ''),
+                        logo_url=c.get('logo_url', '')
+                    )
+                    if str(raw_c_id).isdigit():
+                        company_obj.id = int(raw_c_id)
+                    company_obj.save()
+
+        mongo_rounds = list(db['placement_rounds'].find({}))
+        for r in mongo_rounds:
+            raw_r_id = r.get('_id') or r.get('id')
+            company_id = r.get('company_id')
+            round_num = r.get('round_num', 1)
+            title = r.get('title', '')
+            if company_id and title:
+                company_obj = PlacementCompany.objects.filter(id=company_id).first()
+                if company_obj and not PlacementRound.objects.filter(company=company_obj, round_num=round_num).exists():
+                    r_obj = PlacementRound(
+                        company=company_obj,
+                        round_num=round_num,
+                        title=title,
+                        description=r.get('description', '')
+                    )
+                    if str(raw_r_id).isdigit():
+                        r_obj.id = int(raw_r_id)
+                    r_obj.save()
+
+        mongo_resources = list(db['placement_resources'].find({}))
+        for res in mongo_resources:
+            raw_res_id = res.get('_id') or res.get('id')
+            placement_round_id = res.get('placement_round_id')
+            title = res.get('title', '')
+            if placement_round_id and title:
+                p_round = PlacementRound.objects.filter(id=placement_round_id).first()
+                if p_round and not PlacementResource.objects.filter(placement_round=p_round, title=title).exists():
+                    res_obj = PlacementResource(
+                        placement_round=p_round,
+                        title=title,
+                        file_url=res.get('file_url', ''),
+                        sample_questions=res.get('sample_questions', '')
+                    )
+                    if str(raw_res_id).isdigit():
+                        res_obj.id = int(raw_res_id)
+                    res_obj.save()
+
+        print(f"[MongoDB Auto-Restore] Verified state ({len(mongo_users)} users, {len(mongo_batches)} batches, {len(mongo_notes)} study notes, {len(mongo_companies)} placement companies).")
     except Exception as err:
         print(f"[MongoDB Auto-Restore Error] {err}")

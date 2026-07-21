@@ -68,7 +68,7 @@ export default function Tasks({ API_URL, token }) {
             <div style={styles.cardHeader}>
               <h3 style={styles.title}>{task.title}</h3>
               <span className="badge badge-warning" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>
-                Python-FSD
+                {task.batch_name || 'Batch Task'}
               </span>
             </div>
             

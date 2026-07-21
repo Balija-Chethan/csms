@@ -18,9 +18,14 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class BatchSerializer(serializers.ModelSerializer):
+    enrolled_count = serializers.SerializerMethodField()
+
     class Meta:
         model = Batch
         fields = '__all__'
+
+    def get_enrolled_count(self, obj):
+        return obj.enrollments.filter(status='approved').count()
 
 
 class BatchEnrollmentSerializer(serializers.ModelSerializer):

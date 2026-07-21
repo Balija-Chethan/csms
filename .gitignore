@@ -10,6 +10,8 @@ env/
 
 # Databases
 backend/db.sqlite3
+backend/csms.db
+backend/*.db
 
 # Node & Frontend
 node_modules/

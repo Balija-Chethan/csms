@@ -24,13 +24,12 @@ export default function AdminTasks({ API_URL, token }) {
   useEffect(() => {
     const fetchBatches = async () => {
       try {
-        const res = await fetch(`${API_URL}/admin/pending-students/`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await fetch(`${API_URL}/batches/`);
         const data = await res.json();
-        setBatches(data.batches || []);
-        if (data.batches && data.batches.length > 0) {
-          setSelectedBatchId(data.batches[0].id);
+        const batchList = Array.isArray(data) ? data : (data.batches || []);
+        setBatches(batchList);
+        if (batchList.length > 0) {
+          setSelectedBatchId(batchList[0].id);
         }
       } catch (err) {
         console.error(err);

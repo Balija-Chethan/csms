@@ -21,6 +21,8 @@ class User(AbstractUser):
 class Batch(models.Model):
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, null=True)
+    trainer_name = models.CharField(max_length=100, blank=True, null=True, default="Senior Instructor")
+    max_seats = models.IntegerField(default=60)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -37,6 +39,9 @@ class BatchEnrollment(models.Model):
     batch = models.ForeignKey(Batch, on_delete=models.CASCADE, related_name='enrollments')
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
     joined_at = models.DateTimeField(auto_now_add=True)
+    requested_at = models.DateTimeField(default=timezone.now)
+    approved_at = models.DateTimeField(blank=True, null=True)
+    approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name='approved_enrollments')
 
     class Meta:
         unique_together = ('student', 'batch')

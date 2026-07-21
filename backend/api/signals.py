@@ -42,6 +42,8 @@ def sync_batch_to_mongo(sender, instance, **kwargs):
         'id': instance.id,
         'name': instance.name,
         'description': instance.description,
+        'trainer_name': instance.trainer_name,
+        'max_seats': instance.max_seats,
         'created_at': str(instance.created_at)
     }
     sync_to_mongo('batches', instance.id, data)
@@ -61,7 +63,10 @@ def sync_enrollment_to_mongo(sender, instance, **kwargs):
         'batch_id': instance.batch_id,
         'batch_name': instance.batch.name if instance.batch else None,
         'status': instance.status,
-        'joined_at': str(instance.joined_at)
+        'joined_at': str(instance.joined_at),
+        'requested_at': str(instance.requested_at) if getattr(instance, 'requested_at', None) else None,
+        'approved_at': str(instance.approved_at) if getattr(instance, 'approved_at', None) else None,
+        'approved_by_id': instance.approved_by_id if getattr(instance, 'approved_by_id', None) else None
     }
     sync_to_mongo('batch_enrollments', instance.id, data)
 

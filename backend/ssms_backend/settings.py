@@ -20,7 +20,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Load .env file
 load_dotenv(BASE_DIR / '.env')
 
-MONGODB_URI = os.getenv('MONGODB_URI', "mongodb+srv://nichithasree2006_db_user:nishitha%40223@cluster0.jaxdilz.mongodb.net/csms_db?retryWrites=true&w=majority")
+MONGODB_URI = os.getenv('MONGODB_URI', "mongodb+srv://balija-chethan:Chethan%402107@cluster0.dvawyze.mongodb.net/csms_db?retryWrites=true&w=majority")
 
 
 # Quick-start development settings - unsuitable for production
@@ -88,7 +88,7 @@ WSGI_APPLICATION = 'ssms_backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': BASE_DIR / 'csms.db',
     }
 }
 
