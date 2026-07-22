@@ -2,17 +2,28 @@ import React, { useState, useEffect } from 'react';
 import { Clock, CheckCircle, TrendingUp, Calendar, ClipboardList } from 'lucide-react';
 
 export default function Dashboard({ data, refreshData, API_URL, token, setActiveTab }) {
-  const { 
-    student = {}, 
-    batch = {}, 
-    taskCompletion = { doneRate: 0, completed: 0, pending: 0, notSubmitted: 0 }, 
-    leaderboard = { rank: 'N/A' }, 
-    attendance = { totalDays: 0, rate: 0, present: 0, leave: 0 }, 
-    checkInState = { isCheckedIn: false, isCheckedOut: false, sessionDuration: 0 }, 
-    recentActivities = [],
-    mockDrives = [],
-    gradeTrend = []
+  let { 
+    student, 
+    batch, 
+    taskCompletion, 
+    leaderboard, 
+    attendance, 
+    checkInState, 
+    recentActivities,
+    mockDrives,
+    gradeTrend
   } = data || {};
+
+  student = student || {};
+  batch = batch || {};
+  taskCompletion = taskCompletion || { doneRate: 0, completed: 0, pending: 0, notSubmitted: 0 };
+  leaderboard = leaderboard || { rank: 'N/A' };
+  attendance = attendance || { totalDays: 0, rate: 0, present: 0, leave: 0 };
+  checkInState = checkInState || { isCheckedIn: false, isCheckedOut: false, sessionDuration: 0 };
+  recentActivities = recentActivities || [];
+  mockDrives = mockDrives || [];
+  gradeTrend = gradeTrend || [];
+
   const [checkingIn, setCheckingIn] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(checkInState ? (checkInState.sessionDuration || 0) : 0);
 

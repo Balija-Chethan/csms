@@ -178,6 +178,14 @@ export default function App() {
     );
   }
 
+  if (user.role !== 'admin' && enrollmentStatus === null) {
+    return (
+      <div style={{ display: 'flex', height: '100vh', width: '100vw', alignItems: 'center', justifyContent: 'center', background: '#0b0f19', color: '#fff' }}>
+        <h2>Loading CSMS Portal...</h2>
+      </div>
+    );
+  }
+
   if (!dashboardData && user.role !== 'admin') {
     return (
       <div style={{ display: 'flex', height: '100vh', width: '100vw', alignItems: 'center', justifyContent: 'center', background: '#0b0f19', color: '#fff', flexDirection: 'column', gap: 16 }}>
