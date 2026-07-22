@@ -162,10 +162,6 @@ export default function BatchSelection({ API_URL, token, onEnrollmentRequested }
                     color: '#cbd5e1'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <UserCheck size={16} color="#818cf8" />
-                      <span>Trainer: <strong>{b.trainer_name || "Senior Instructor"}</strong></span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <Layers size={16} color="#818cf8" />
                       <span>Capacity: {b.enrolled_count || 0} / {b.max_seats || 60} Enrolled</span>
                     </div>
