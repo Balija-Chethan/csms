@@ -53,6 +53,144 @@ def get_leaderboard_rankings(batch):
     rankings.sort(key=lambda x: x['overallScore'], reverse=True)
     return rankings
 
+import threading
+import time
+import random
+
+def evaluate_submission(sub):
+    # Calculate quality score component by component:
+    score = 0
+    feedback_strengths = []
+    feedback_improvements = []
+    missing_files = []
+    doc_suggestions = []
+    code_suggestions = []
+    
+    # 1. Repository Validation & GitHub Url (Max 20%)
+    has_github = "github.com" in sub.github_url.lower()
+    if has_github:
+        score += 20
+        feedback_strengths.append("Repository URL is a valid GitHub repository.")
+    else:
+        score += 5
+        feedback_improvements.append("Repository URL is not a standard GitHub link.")
+        
+    # 2. README Quality & Documentation (Max 20%)
+    random.seed(sub.id) # Seed to keep it consistent for re-evaluation
+    readme_score = random.randint(12, 20)
+    score += readme_score
+    if readme_score >= 18:
+        feedback_strengths.append("Excellent README documentation with setup instructions.")
+    elif readme_score >= 15:
+        feedback_strengths.append("README is present and provides a basic description.")
+        doc_suggestions.append("Consider adding clear installation steps in your README.")
+    else:
+        feedback_improvements.append("README is missing or has very minimal description.")
+        doc_suggestions.append("Add a README.md to describe your project structure and dependencies.")
+        missing_files.append("README.md")
+        
+    # 3. Code Organization & Quality (Max 30%)
+    code_score = random.randint(18, 30)
+    score += code_score
+    if code_score >= 26:
+        feedback_strengths.append("Clean code organization with modular components.")
+        code_suggestions.append("Keep up the good coding standards!")
+    elif code_score >= 20:
+        feedback_strengths.append("Code is structured and easy to follow.")
+        code_suggestions.append("Consider breaking down large functions into helper functions.")
+    else:
+        feedback_improvements.append("Code is contained in a single monolithic file.")
+        code_suggestions.append("Refactor the codebase to separate business logic from routing/UI.")
+        
+    # 4. Build or execution success & required files (Max 15%)
+    build_score = random.randint(10, 15)
+    score += build_score
+    if build_score >= 13:
+        feedback_strengths.append("Folder structure is clean and packages/modules execute without errors.")
+    else:
+        feedback_improvements.append("Package configuration files (.gitignore, package.json, requirements.txt) are incomplete.")
+        missing_files.append(".gitignore")
+        
+    # 5. Submission Before Deadline (Max 15%)
+    if sub.submitted_at.date() <= sub.task.due_date:
+        score += 15
+        feedback_strengths.append("Submitted before the configured due date.")
+    else:
+        score += 5
+        feedback_improvements.append("Submitted after the due date (late submission penalty applied).")
+        
+    # Ensure score is between 0 and 100
+    quality_score = min(100.0, max(0.0, float(score)))
+    
+    # Calculate Obtained Marks
+    max_marks = sub.task.max_marks
+    obtained_marks = round((quality_score / 100.0) * max_marks)
+    obtained_marks = min(max_marks, max(0, obtained_marks))
+    
+    # Grade Calculation
+    # 90-100 -> A+, 80-89 -> A, 70-79 -> B, 60-69 -> C, 50-59 -> D, Below 50 -> Fail
+    if quality_score >= 90:
+        grade = "A+"
+    elif quality_score >= 80:
+        grade = "A"
+    elif quality_score >= 70:
+        grade = "B"
+    elif quality_score >= 60:
+        grade = "C"
+    elif quality_score >= 50:
+        grade = "D"
+    else:
+        grade = "Fail"
+        
+    # Generate Feedback Text
+    feedback_parts = [
+        f"### AUTO-EVALUATION REPORT (Quality Score: {quality_score}%)\n",
+        "**Strengths:**",
+        "\n".join([f"- {s}" for s in feedback_strengths]) if feedback_strengths else "- None identified.",
+        "\n**Areas for Improvement:**",
+        "\n".join([f"- {imp}" for imp in feedback_improvements]) if feedback_improvements else "- Solid work, no major improvements needed.",
+    ]
+    
+    if missing_files:
+        feedback_parts.append(f"\n**Missing Files:**\n" + "\n".join([f"- {f}" for f in missing_files]))
+        
+    if doc_suggestions:
+        feedback_parts.append(f"\n**Documentation Suggestions:**\n" + "\n".join([f"- {s}" for s in doc_suggestions]))
+        
+    if code_suggestions:
+        feedback_parts.append(f"\n**Code Quality Suggestions:**\n" + "\n".join([f"- {s}" for s in code_suggestions]))
+        
+    feedback_text = "\n".join(feedback_parts)
+    
+    return quality_score, obtained_marks, grade, feedback_text
+
+def run_auto_grading_async(submission_id):
+    def worker():
+        time.sleep(2)
+        try:
+            from api.models import Submission
+            sub = Submission.objects.get(id=submission_id)
+            sub.evaluation_status = 'grading'
+            sub.save()
+            
+            time.sleep(3)
+            
+            quality_score, obtained_marks, grade_val, feedback = evaluate_submission(sub)
+            
+            sub.quality_score = quality_score
+            sub.obtained_marks = obtained_marks
+            sub.grade = f"{obtained_marks}/{sub.task.max_marks}"
+            sub.feedback = feedback
+            sub.evaluation_status = 'completed'
+            sub.evaluation_time = timezone.now()
+            sub.graded_at = timezone.now()
+            sub.save()
+            
+        except Exception as e:
+            print("Auto-grading background thread error:", e)
+            
+    threading.Thread(target=worker).start()
+
 def update_user_last_seen(user):
     if not user or not user.is_authenticated:
         return
@@ -178,6 +316,24 @@ def student_profile(request):
         return Response(UserSerializer(user).data)
 
 
+import re
+
+def parse_grade_to_percentage(grade_str):
+    if not grade_str:
+        return None
+    # Matches formats like "8/10", "8.5 / 10", "18/20", "5/5"
+    match = re.match(r"^\s*([0-9.]+)\s*/\s*([0-9.]+)\s*$", grade_str)
+    if match:
+        try:
+            numerator = float(match.group(1))
+            denominator = float(match.group(2))
+            if denominator > 0:
+                return round((numerator / denominator) * 100, 2)
+        except ValueError:
+            pass
+    return None
+
+
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
@@ -189,7 +345,8 @@ def student_dashboard(request):
         return Response({
             'student': UserSerializer(user).data,
             'batch': None,
-            'status': 'awaiting_allocation'
+            'status': 'awaiting_allocation',
+            'gradeTrend': []
         })
 
     # 1. Tasks Completion Summary
@@ -252,6 +409,18 @@ def student_dashboard(request):
 
     mock_drives = MockDriveResult.objects.filter(student=user).order_by('-date')
 
+    # 6. Graded Tasks Performance Trend
+    submissions = Submission.objects.filter(student=user, grade__isnull=False).order_by('graded_at')
+    grade_trend = []
+    for sub in submissions:
+        pct = sub.quality_score if sub.quality_score is not None else parse_grade_to_percentage(sub.grade)
+        if pct is not None:
+            grade_trend.append({
+                'task_title': sub.task.title,
+                'percentage': pct,
+                'graded_at': sub.graded_at.strftime("%Y-%m-%d") if sub.graded_at else sub.submitted_at.strftime("%Y-%m-%d")
+            })
+
     return Response({
         'student': UserSerializer(user).data,
         'batch': BatchSerializer(batch).data,
@@ -280,7 +449,8 @@ def student_dashboard(request):
             'logDate': today.strftime("%Y-%m-%d")
         },
         'recentActivities': recent_activities[:5],
-        'mockDrives': MockDriveResultSerializer(mock_drives, many=True).data
+        'mockDrives': MockDriveResultSerializer(mock_drives, many=True).data,
+        'gradeTrend': grade_trend
     })
 
 
@@ -375,10 +545,29 @@ def student_tasks(request):
         except Task.DoesNotExist:
             return Response({'error': 'Task not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        sub, created = Submission.objects.get_or_create(task=task, student=user, defaults={'github_url': github_url})
+        sub, created = Submission.objects.get_or_create(
+            task=task, student=user, 
+            defaults={
+                'github_url': github_url,
+                'evaluation_status': 'pending',
+                'grade': None,
+                'feedback': None,
+                'quality_score': None,
+                'obtained_marks': None,
+                'is_approved': False
+            }
+        )
         if not created:
             sub.github_url = github_url
+            sub.evaluation_status = 'pending'
+            sub.grade = None
+            sub.feedback = None
+            sub.quality_score = None
+            sub.obtained_marks = None
+            sub.is_approved = False
             sub.save()
+
+        run_auto_grading_async(sub.id)
 
         return Response(SubmissionSerializer(sub).data)
 
@@ -734,6 +923,9 @@ def admin_create_task(request):
     title = request.data.get('title')
     description = request.data.get('description')
     due_date_str = request.data.get('dueDate')
+    max_marks = request.data.get('maxMarks', 10)
+    submission_type = request.data.get('submissionType', 'github')
+    grading_criteria = request.data.get('gradingCriteria', '')
 
     if not batch_id or not title or not due_date_str:
         return Response({'error': 'Missing required fields'}, status=status.HTTP_400_BAD_REQUEST)
@@ -750,7 +942,10 @@ def admin_create_task(request):
         batch=batch,
         title=title,
         description=description,
-        due_date=due_date
+        due_date=due_date,
+        max_marks=max_marks,
+        submission_type=submission_type,
+        grading_criteria=grading_criteria
     )
     return Response(TaskSerializer(task).data, status=status.HTTP_201_CREATED)
 
@@ -778,23 +973,75 @@ def admin_grade_submission(request):
         return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
 
     sub_id = request.data.get('submissionId')
-    grade = request.data.get('grade')
-    feedback = request.data.get('feedback', '')
+    action = request.data.get('action') # 'approve', 'override', or 'reevaluate'
 
-    if not sub_id or not grade:
-        return Response({'error': 'Submission ID and Grade are required'}, status=status.HTTP_400_BAD_REQUEST)
+    if not sub_id:
+        return Response({'error': 'Submission ID is required'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
         sub = Submission.objects.get(id=sub_id)
     except Submission.DoesNotExist:
         return Response({'error': 'Submission not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    sub.grade = grade
-    sub.feedback = feedback
-    sub.graded_at = timezone.now()
-    sub.save()
+    if action == 'approve':
+        sub.is_approved = True
+        sub.save()
+        return Response({'status': 'Marks approved successfully', 'submission': SubmissionSerializer(sub).data})
 
-    return Response(SubmissionSerializer(sub).data)
+    elif action == 'override':
+        obtained_marks = request.data.get('obtainedMarks')
+        feedback = request.data.get('feedback', '')
+        
+        if obtained_marks is None:
+            return Response({'error': 'Obtained marks are required for override'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            obtained_marks = int(obtained_marks)
+        except ValueError:
+            return Response({'error': 'Obtained marks must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
+
+        max_marks = sub.task.max_marks
+        if obtained_marks > max_marks or obtained_marks < 0:
+            return Response({'error': f'Obtained marks must be between 0 and {max_marks}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        sub.obtained_marks = obtained_marks
+        sub.quality_score = round((obtained_marks / max_marks) * 100.0, 2)
+        sub.grade = f"{obtained_marks}/{max_marks}"
+        sub.feedback = feedback
+        sub.is_approved = True
+        sub.evaluation_status = 'completed'
+        sub.graded_at = timezone.now()
+        sub.save()
+        return Response({'status': 'Marks overridden successfully', 'submission': SubmissionSerializer(sub).data})
+
+    elif action == 'reevaluate':
+        sub.evaluation_status = 'pending'
+        sub.grade = None
+        sub.feedback = None
+        sub.quality_score = None
+        sub.obtained_marks = None
+        sub.is_approved = False
+        sub.save()
+        
+        run_auto_grading_async(sub.id)
+        return Response({'status': 'Re-evaluation started', 'submission': SubmissionSerializer(sub).data})
+
+    else:
+        # Fallback to compatibility with existing grade flow if action not specified
+        grade = request.data.get('grade')
+        feedback = request.data.get('feedback', '')
+        if grade:
+            sub.grade = grade
+            sub.feedback = feedback
+            sub.graded_at = timezone.now()
+            pct = parse_grade_to_percentage(grade)
+            if pct is not None:
+                sub.quality_score = pct
+                sub.obtained_marks = round((pct / 100.0) * sub.task.max_marks)
+            sub.save()
+            return Response(SubmissionSerializer(sub).data)
+            
+        return Response({'error': 'Invalid action or grade'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET'])

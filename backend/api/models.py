@@ -55,6 +55,9 @@ class Task(models.Model):
     title = models.CharField(max_length=200)
     description = models.TextField(help_text="Markdown content of the task instructions")
     due_date = models.DateField()
+    max_marks = models.IntegerField(default=10)
+    submission_type = models.CharField(max_length=20, default='github')
+    grading_criteria = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -67,6 +70,11 @@ class Submission(models.Model):
     github_url = models.URLField()
     grade = models.CharField(max_length=10, blank=True, null=True, help_text="e.g. 5/5, 10/10, etc.")
     feedback = models.TextField(blank=True, null=True)
+    quality_score = models.FloatField(blank=True, null=True)
+    obtained_marks = models.IntegerField(blank=True, null=True)
+    evaluation_status = models.CharField(max_length=20, default='pending', choices=[('pending', 'Pending'), ('grading', 'Auto Grading...'), ('completed', 'Completed')])
+    evaluation_time = models.DateTimeField(blank=True, null=True)
+    is_approved = models.BooleanField(default=False)
     graded_at = models.DateTimeField(blank=True, null=True)
     submitted_at = models.DateTimeField(auto_now_add=True)
 

@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { Mail, Lock, LogIn, ArrowRight } from 'lucide-react';
 
 export default function Login({ setAuth, API_URL }) {
-  const [email, setEmail] = useState('23691a3340@mits.ac.in');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isRegister, setIsRegister] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -50,47 +50,7 @@ export default function Login({ setAuth, API_URL }) {
     }
   };
 
-  const handleDemoLogin = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await fetch(`${API_URL}/auth/login/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: '23691a3340@mits.ac.in', password: 'password123' })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Login failed');
-      localStorage.setItem('csms_token', data.token);
-      localStorage.setItem('csms_user', JSON.stringify(data.user));
-      setAuth(data.user, data.token);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const handleDemoAdminLogin = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await fetch(`${API_URL}/auth/login/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'chethan@csms', password: 'password123' })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Admin login failed');
-      localStorage.setItem('csms_token', data.token);
-      localStorage.setItem('csms_user', JSON.stringify(data.user));
-      setAuth(data.user, data.token);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div style={styles.container}>
@@ -155,9 +115,10 @@ export default function Login({ setAuth, API_URL }) {
                     <input 
                       type="text" 
                       className="custom-input" 
-                      placeholder="Nichitha" 
+                      placeholder="First Name" 
                       value={firstName} 
                       onChange={e => setFirstName(e.target.value)} 
+                      autoComplete="off"
                       required
                     />
                   </div>
@@ -166,9 +127,10 @@ export default function Login({ setAuth, API_URL }) {
                     <input 
                       type="text" 
                       className="custom-input" 
-                      placeholder="Sree" 
+                      placeholder="Last Name" 
                       value={lastName} 
                       onChange={e => setLastName(e.target.value)} 
+                      autoComplete="off"
                       required
                     />
                   </div>
@@ -180,9 +142,10 @@ export default function Login({ setAuth, API_URL }) {
                     <input 
                       type="text" 
                       className="custom-input" 
-                      placeholder="23691A3340" 
+                      placeholder="Roll Number" 
                       value={rollNumber} 
                       onChange={e => setRollNumber(e.target.value)} 
+                      autoComplete="off"
                     />
                   </div>
                   <div style={styles.inputWrapper}>
@@ -190,9 +153,10 @@ export default function Login({ setAuth, API_URL }) {
                     <input 
                       type="tel" 
                       className="custom-input" 
-                      placeholder="9908322634" 
+                      placeholder="Phone Number" 
                       value={phoneNumber} 
                       onChange={e => setPhoneNumber(e.target.value)} 
+                      autoComplete="off"
                     />
                   </div>
                 </div>
@@ -206,10 +170,11 @@ export default function Login({ setAuth, API_URL }) {
                 <input 
                   type="email" 
                   className="custom-input" 
-                  placeholder="name@mits.ac.in" 
+                  placeholder="Email Address" 
                   value={email} 
                   onChange={e => setEmail(e.target.value)} 
                   style={{ paddingLeft: 44 }}
+                  autoComplete="off"
                   required
                 />
               </div>
@@ -222,10 +187,11 @@ export default function Login({ setAuth, API_URL }) {
                 <input 
                   type="password" 
                   className="custom-input" 
-                  placeholder="••••••••" 
+                  placeholder="Password" 
                   value={password} 
                   onChange={e => setPassword(e.target.value)} 
                   style={{ paddingLeft: 44 }}
+                  autoComplete="new-password"
                   required
                 />
               </div>
@@ -237,29 +203,7 @@ export default function Login({ setAuth, API_URL }) {
             </button>
           </form>
 
-          {!isRegister && (
-            <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-              <button 
-                type="button" 
-                className="btn-secondary" 
-                onClick={handleDemoLogin} 
-                style={{ flex: 1, justifyContent: 'center', border: '1px solid rgba(59, 130, 246, 0.4)', padding: '10px 8px', fontSize: 12 }}
-              >
-                Demo Student
-                <ArrowRight size={14} />
-              </button>
 
-              <button 
-                type="button" 
-                className="btn-secondary" 
-                onClick={handleDemoAdminLogin} 
-                style={{ flex: 1, justifyContent: 'center', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#f87171', padding: '10px 8px', fontSize: 12 }}
-              >
-                Demo Admin
-                <ArrowRight size={14} />
-              </button>
-            </div>
-          )}
 
 
           <div style={styles.toggleContainer}>

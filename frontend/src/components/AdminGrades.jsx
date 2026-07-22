@@ -20,7 +20,7 @@ export default function AdminGrades({ API_URL, token }) {
       const grades = {};
       const feedbacks = {};
       data.forEach(sub => {
-        grades[sub.id] = sub.grade || '';
+        grades[sub.id] = sub.obtained_marks !== null ? sub.obtained_marks.toString() : '';
         feedbacks[sub.id] = sub.feedback || '';
       });
       setGradeInput(grades);
@@ -36,27 +36,23 @@ export default function AdminGrades({ API_URL, token }) {
     fetchSubmissions();
   }, []);
 
-  const handleGrade = async (submissionId) => {
-    const grade = gradeInput[submissionId];
-    const feedback = feedbackInput[submissionId] || '';
-    if (!grade || !grade.trim()) return alert('Please enter a grade score (e.g. 10/10)');
-
+  const handleAction = async (submissionId, actionType, extraData = {}) => {
     setGrading(prev => ({ ...prev, [submissionId]: true }));
     try {
+      const body = { submissionId, action: actionType, ...extraData };
       const res = await fetch(`${API_URL}/admin/grade-submission/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ submissionId, grade: grade.trim(), feedback: feedback.trim() })
+        body: JSON.stringify(body)
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      // Local state update for instant feedback
-      setSubmissions(prev => prev.map(s => s.id === submissionId ? { ...s, grade: grade.trim(), feedback: feedback.trim() } : s));
-      alert('Submission graded successfully!');
+      fetchSubmissions();
+      alert(data.status || 'Operation successful!');
     } catch (err) {
       alert(err.message);
     } finally {
@@ -125,7 +121,9 @@ export default function AdminGrades({ API_URL, token }) {
                   </span>
                 </div>
                 <div>
-                  {sub.grade ? (
+                  {sub.evaluation_status === 'grading' ? (
+                    <span className="badge badge-warning">Auto Grading...</span>
+                  ) : sub.evaluation_status === 'completed' || sub.grade ? (
                     <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                       <CheckCircle2 size={12} /> Graded ({sub.grade})
                     </span>
@@ -142,23 +140,62 @@ export default function AdminGrades({ API_URL, token }) {
                 <span style={styles.date}>Uploaded: {new Date(sub.submitted_at).toLocaleDateString()}</span>
               </div>
 
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', margin: '12px 0', fontSize: 13, background: 'rgba(0,0,0,0.15)', padding: 12, borderRadius: 8 }}>
+                <div>Max Marks: <strong style={{ color: '#ffffff' }}>{sub.task_max_marks || 10}</strong></div>
+                <div>Obtained Marks: <strong style={{ color: '#ffffff' }}>{sub.obtained_marks !== null ? sub.obtained_marks : 'N/A'}</strong></div>
+                <div>Quality Score: <strong style={{ color: '#60a5fa' }}>{sub.quality_score !== null ? `${sub.quality_score}%` : 'N/A'}</strong></div>
+                <div>Evaluation Status: 
+                  <strong style={{ marginLeft: 6, color: sub.evaluation_status === 'completed' ? '#10b981' : '#f59e0b' }}>
+                    {sub.evaluation_status ? sub.evaluation_status.toUpperCase() : 'PENDING'}
+                  </strong>
+                </div>
+                {sub.is_approved && (
+                  <div style={{ gridColumn: '1 / -1', color: '#10b981', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+                    <CheckCircle2 size={12} /> Marks Approved
+                  </div>
+                )}
+              </div>
+
               <div style={styles.gradingSection}>
-                <div style={styles.inputWrapper}>
-                  <label style={styles.label}>Award Grade (e.g. 10/10, 5/5)</label>
-                  <input 
-                    type="text" 
-                    className="custom-input" 
-                    placeholder="10/10"
-                    value={gradeInput[sub.id] || ''}
-                    onChange={e => setGradeInput(prev => ({ ...prev, [sub.id]: e.target.value }))}
-                  />
+                <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+                  <button 
+                    className="btn-secondary" 
+                    onClick={() => handleAction(sub.id, 'approve')}
+                    disabled={sub.is_approved || grading[sub.id] || sub.evaluation_status !== 'completed'}
+                    style={{ flex: 1, fontSize: 12, padding: '8px 4px', justifyContent: 'center' }}
+                  >
+                    Approve Marks
+                  </button>
+                  <button 
+                    className="btn-secondary" 
+                    onClick={() => handleAction(sub.id, 'reevaluate')}
+                    disabled={grading[sub.id]}
+                    style={{ flex: 1, fontSize: 12, padding: '8px 4px', justifyContent: 'center' }}
+                  >
+                    Re-evaluate
+                  </button>
+                </div>
+
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12 }}>
+                  <label style={styles.label}>Override Marks (Out of {sub.task_max_marks || 10})</label>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
+                    <input 
+                      type="number" 
+                      className="custom-input" 
+                      placeholder="e.g. 8"
+                      value={gradeInput[sub.id] || ''}
+                      onChange={e => setGradeInput(prev => ({ ...prev, [sub.id]: e.target.value }))}
+                      style={{ width: 80 }}
+                    />
+                    <span style={{ color: '#9ca3af', fontSize: 14 }}>/ {sub.task_max_marks || 10}</span>
+                  </div>
                 </div>
 
                 <div style={styles.inputWrapper}>
                   <label style={styles.label}>Feedback Comments</label>
                   <textarea 
                     className="custom-input" 
-                    placeholder="Good modular styling, clean code..."
+                    placeholder="Provide evaluation notes..."
                     value={feedbackInput[sub.id] || ''}
                     onChange={e => setFeedbackInput(prev => ({ ...prev, [sub.id]: e.target.value }))}
                     style={{ minHeight: 60, resize: 'vertical' }}
@@ -167,11 +204,11 @@ export default function AdminGrades({ API_URL, token }) {
 
                 <button 
                   className="btn-primary" 
-                  onClick={() => handleGrade(sub.id)}
+                  onClick={() => handleAction(sub.id, 'override', { obtainedMarks: gradeInput[sub.id], feedback: feedbackInput[sub.id] })}
                   disabled={grading[sub.id]}
                   style={{ width: '100%', justifyContent: 'center', marginTop: 8 }}
                 >
-                  <Send size={14} /> {grading[sub.id] ? 'Saving...' : 'Save Grade & Feedback'}
+                  <Send size={14} /> {grading[sub.id] ? 'Saving...' : 'Override Marks'}
                 </button>
               </div>
             </div>

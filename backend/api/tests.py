@@ -1,7 +1,7 @@
 from django.test import TestCase
 from django.utils import timezone
 from datetime import date, timedelta
-from api.models import User, Batch, Task, StudyNote, LeetcodeChallenge, AttendanceLog, MockDriveResult, LeaveRequest, BatchEnrollment
+from api.models import User, Batch, Task, StudyNote, LeetcodeChallenge, AttendanceLog, MockDriveResult, LeaveRequest, BatchEnrollment, Submission
 from rest_framework.test import APIClient
 from rest_framework import status
 from api.auth_utils import generate_token
@@ -113,8 +113,6 @@ class CSMSTests(TestCase):
         )
 
         # 2. Approve enrollment today (so Day 1 is unlocked today, Day 2 unlocks tomorrow)
-        # Dynamic unlock date formula: approved_date + (day_number - 1) days
-        # approved_date is today. So ch1 (day 1) unlocks today. ch2 (day 2) unlocks tomorrow (today + 1 day).
         BatchEnrollment.objects.create(
             student=self.student, 
             batch=self.batch, 
@@ -128,15 +126,13 @@ class CSMSTests(TestCase):
         data = response.json()
         challenges = data['challenges']
         
-        # Verify Day 1 challenge details
         c1 = [c for c in challenges if c['id'] == ch1.id][0]
         self.assertTrue(c1['is_unlocked'])
         self.assertEqual(c1['url'], "http://leetcode.com/twosum")
         
-        # Verify Day 2 challenge details
         c2 = [c for c in challenges if c['id'] == ch2.id][0]
         self.assertFalse(c2['is_unlocked'])
-        self.assertEqual(c2['url'], "") # Url should be masked
+        self.assertEqual(c2['url'], "")
 
         # 4. Request POST for Day 1: should succeed
         response = self.client.post('/student/leetcode/', {'challengeId': ch1.id, 'submissionUrl': 'http://leetcode.com/sub1'}, format='json')
@@ -146,3 +142,103 @@ class CSMSTests(TestCase):
         response = self.client.post('/student/leetcode/', {'challengeId': ch2.id, 'submissionUrl': 'http://leetcode.com/sub2'}, format='json')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(response.json()['error'], "This problem has not been unlocked yet.")
+
+    def test_student_dashboard_grade_trend(self):
+        """Dashboard grade trend should be empty for new students, show 1 point for 1 task, and connect them for 2+ tasks."""
+        # 1. New student should get empty trend
+        BatchEnrollment.objects.create(student=self.student, batch=self.batch, status="approved")
+        
+        response = self.client.get('/student/dashboard/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['gradeTrend'], [])
+
+        # 2. Add one graded task submission (Task 1: 8/10 -> 80%)
+        task1 = Task.objects.create(title="Task 1", batch=self.batch, due_date=date.today())
+        sub1 = Submission.objects.create(
+            task=task1, 
+            student=self.student, 
+            github_url="http://github.com/1",
+            grade="8/10",
+            graded_at=timezone.now() - timedelta(days=2)
+        )
+        
+        response = self.client.get('/student/dashboard/')
+        trend = response.json()['gradeTrend']
+        self.assertEqual(len(trend), 1)
+        self.assertEqual(trend[0]['percentage'], 80.0)
+
+        # 3. Add second graded task submission (Task 2: 18/20 -> 90%)
+        task2 = Task.objects.create(title="Task 2", batch=self.batch, due_date=date.today())
+        sub2 = Submission.objects.create(
+            task=task2, 
+            student=self.student, 
+            github_url="http://github.com/2",
+            grade="18/20",
+            graded_at=timezone.now() - timedelta(days=1)
+        )
+        
+        response = self.client.get('/student/dashboard/')
+        trend = response.json()['gradeTrend']
+        self.assertEqual(len(trend), 2)
+        self.assertEqual(trend[0]['percentage'], 80.0)
+        self.assertEqual(trend[1]['percentage'], 90.0)
+
+    def test_auto_grading_system(self):
+        """Auto grading system should compute quality scores, obtained marks, grades, and support override/approve/reevaluate actions."""
+        # 1. Create a task with max marks = 50
+        task = Task.objects.create(
+            title="Project Evaluation", 
+            batch=self.batch, 
+            due_date=date.today(),
+            max_marks=50,
+            submission_type='github'
+        )
+
+        # 2. Student submits task
+        response = self.client.post('/student/tasks/', {
+            'taskId': task.id,
+            'githubUrl': 'https://github.com/test/repo'
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        sub = Submission.objects.get(task=task, student=self.student)
+        self.assertEqual(sub.evaluation_status, 'pending')
+
+        # 3. Explicitly evaluate to test logic synchronously
+        from api.views import evaluate_submission
+        quality_score, obtained_marks, grade, feedback = evaluate_submission(sub)
+        
+        self.assertTrue(0 <= quality_score <= 100)
+        self.assertEqual(obtained_marks, round((quality_score / 100.0) * 50))
+
+        # Save evaluations to DB
+        sub.quality_score = quality_score
+        sub.obtained_marks = obtained_marks
+        sub.grade = f"{obtained_marks}/50"
+        sub.feedback = feedback
+        sub.evaluation_status = 'completed'
+        sub.save()
+
+        # 4. Admin Approves Marks
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {generate_token(self.admin)}')
+        response = self.client.post('/admin/grade-submission/', {
+            'submissionId': sub.id,
+            'action': 'approve'
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        sub.refresh_from_db()
+        self.assertTrue(sub.is_approved)
+
+        # 5. Admin Overrides Marks to 45/50
+        response = self.client.post('/admin/grade-submission/', {
+            'submissionId': sub.id,
+            'action': 'override',
+            'obtainedMarks': 45,
+            'feedback': 'Great presentation override'
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        sub.refresh_from_db()
+        self.assertEqual(sub.obtained_marks, 45)
+        self.assertEqual(sub.quality_score, 90.0)
+        self.assertEqual(sub.grade, "45/50")
+        self.assertEqual(sub.feedback, "Great presentation override")

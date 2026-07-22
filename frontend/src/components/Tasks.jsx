@@ -29,6 +29,22 @@ export default function Tasks({ API_URL, token }) {
     fetchTasks();
   }, []);
 
+  // Dynamic polling for pending/grading submissions
+  useEffect(() => {
+    if (!tasks || !Array.isArray(tasks)) return;
+    const hasPendingOrGrading = tasks.some(task => 
+      task.submission && 
+      (task.submission.evaluation_status === 'pending' || task.submission.evaluation_status === 'grading')
+    );
+
+    if (hasPendingOrGrading) {
+      const timer = setTimeout(() => {
+        fetchTasks();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [tasks]);
+
   const handleSubmit = async (taskId) => {
     const url = submitUrl[taskId];
     if (!url) return alert('Please enter a GitHub URL');
@@ -82,12 +98,32 @@ export default function Tasks({ API_URL, token }) {
               <div style={styles.subStatus}>
                 <div style={styles.statusRow}>
                   <span>Status: </span>
-                  {task.submission.grade ? (
+                  {task.submission.evaluation_status === 'grading' ? (
+                    <span className="badge badge-warning">Auto Grading...</span>
+                  ) : task.submission.evaluation_status === 'completed' || task.submission.grade ? (
                     <span className="badge badge-success">Graded ({task.submission.grade})</span>
                   ) : (
                     <span className="badge badge-warning">Awaiting Review</span>
                   )}
                 </div>
+                
+                {task.submission.evaluation_status === 'completed' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#9ca3af', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10 }}>
+                    {task.submission.quality_score !== null && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Quality Score:</span>
+                        <strong style={{ color: '#60a5fa' }}>{task.submission.quality_score}%</strong>
+                      </div>
+                    )}
+                    {task.submission.evaluation_time && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Evaluation Date:</span>
+                        <strong>{new Date(task.submission.evaluation_time).toLocaleDateString()}</strong>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div style={styles.subLinkRow}>
                   <a href={task.submission.github_url} target="_blank" rel="noopener noreferrer" style={styles.extLink}>
                     View Submitted Work <ExternalLink size={14} />
@@ -95,7 +131,10 @@ export default function Tasks({ API_URL, token }) {
                 </div>
                 {task.submission.feedback && (
                   <div style={styles.feedbackBox}>
-                    <strong>Feedback:</strong> {task.submission.feedback}
+                    <strong>Auto-Grading Report:</strong>
+                    <div style={{ whiteSpace: 'pre-wrap', marginTop: 6, maxHeight: 150, overflowY: 'auto', fontSize: 12, lineHeight: 1.5 }}>
+                      {task.submission.feedback}
+                    </div>
                   </div>
                 )}
               </div>

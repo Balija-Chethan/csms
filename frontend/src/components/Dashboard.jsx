@@ -10,7 +10,8 @@ export default function Dashboard({ data, refreshData, API_URL, token, setActive
     attendance = { totalDays: 0, rate: 0, present: 0, leave: 0 }, 
     checkInState = { isCheckedIn: false, isCheckedOut: false, sessionDuration: 0 }, 
     recentActivities = [],
-    mockDrives = []
+    mockDrives = [],
+    gradeTrend = []
   } = data || {};
   const [checkingIn, setCheckingIn] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(checkInState ? (checkInState.sessionDuration || 0) : 0);
@@ -33,6 +34,90 @@ export default function Dashboard({ data, refreshData, API_URL, token, setActive
     const mins = Math.floor((totalSecs % 3600) / 60).toString().padStart(2, '0');
     const secs = (totalSecs % 60).toString().padStart(2, '0');
     return `${hrs}:${mins}:${secs}`;
+  };
+
+  const renderChart = () => {
+    const points = gradeTrend || [];
+    if (points.length === 0) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 160, color: '#9ca3af', textAlign: 'center', width: '100%' }}>
+          <TrendingUp size={36} style={{ marginBottom: 12, color: '#4b5563' }} />
+          <span style={{ fontSize: 14, fontWeight: '500' }}>No graded tasks available</span>
+          <span style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>Complete and get your first graded task to see your performance trend.</span>
+        </div>
+      );
+    }
+
+    const width = 500;
+    const height = 150;
+    const paddingX = 45;
+    const paddingY = 25;
+    const plotWidth = width - 2 * paddingX;
+    const plotHeight = height - 2 * paddingY;
+
+    // Calculate coordinates
+    const coords = points.map((p, idx) => {
+      const x = points.length === 1 
+        ? width / 2 
+        : paddingX + (idx / (points.length - 1)) * plotWidth;
+      const y = height - paddingY - (p.percentage / 100) * plotHeight;
+      return { x, y, ...p };
+    });
+
+    // Build path for line
+    let linePath = "";
+    let areaPath = "";
+    if (coords.length > 1) {
+      linePath = `M ${coords[0].x} ${coords[0].y} ` + coords.slice(1).map(c => `L ${c.x} ${c.y}`).join(" ");
+      areaPath = linePath + ` L ${coords[coords.length - 1].x} ${height - paddingY} L ${coords[0].x} ${height - paddingY} Z`;
+    }
+
+    return (
+      <div style={{ width: '100%', overflowX: 'auto', padding: '10px 0' }}>
+        <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} style={{ overflow: 'visible' }}>
+          <defs>
+            <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
+            </linearGradient>
+          </defs>
+          
+          {/* Horizontal grid lines for 0%, 50%, 100% */}
+          {[0, 50, 100].map(val => {
+            const y = height - paddingY - (val / 100) * plotHeight;
+            return (
+              <g key={val}>
+                <line x1={paddingX} y1={y} x2={width - paddingX} y2={y} stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
+                <text x={paddingX - 8} y={y + 4} fill="#6b7280" fontSize="9" textAnchor="end">{val}%</text>
+              </g>
+            );
+          })}
+
+          {/* Fill Area (2+ points) */}
+          {coords.length > 1 && (
+            <path d={areaPath} fill="url(#chartGrad)" />
+          )}
+
+          {/* Connection Line (2+ points) */}
+          {coords.length > 1 && (
+            <path d={linePath} fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          )}
+
+          {/* Data points (circles & labels) */}
+          {coords.map((c, idx) => (
+            <g key={idx}>
+              <circle cx={c.x} cy={c.y} r="5" fill="#3b82f6" stroke="#ffffff" strokeWidth="2" />
+              <text x={c.x} y={c.y - 10} fill="#ffffff" fontSize="10" fontWeight="bold" textAnchor="middle">
+                {Math.round(c.percentage)}%
+              </text>
+              <text x={c.x} y={height - 6} fill="#9ca3af" fontSize="9" textAnchor="middle" title={c.task_title}>
+                T{idx + 1}
+              </text>
+            </g>
+          ))}
+        </svg>
+      </div>
+    );
   };
 
   const handleCheckInOut = async () => {
@@ -283,16 +368,17 @@ export default function Dashboard({ data, refreshData, API_URL, token, setActive
 
       {/* Score History and Recent Activities Grid */}
       <div style={styles.bottomGrid}>
-        <div className="glass-card" style={{ flex: 1 }}>
+        <div className="glass-card" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           <h3 style={{ marginBottom: 20 }}>Score Grades Trend</h3>
-          <div style={styles.chartMock}>
-            <div style={{ height: 20, width: '10%', background: '#3b82f6', borderRadius: 4 }}></div>
-            <div style={{ height: 40, width: '15%', background: '#3b82f6', borderRadius: 4 }}></div>
-            <div style={{ height: 60, width: '20%', background: '#3b82f6', borderRadius: 4 }}></div>
-            <div style={{ height: 100, width: '25%', background: '#3b82f6', borderRadius: 4 }}></div>
-            <div style={{ height: 120, width: '30%', background: '#3b82f6', borderRadius: 4 }}></div>
-          </div>
-          <span style={{ fontSize: 12, color: '#9ca3af', marginTop: 12, display: 'block' }}>Grades increasing consistently across tasks</span>
+          {renderChart()}
+          {gradeTrend && gradeTrend.length > 0 && (
+            <span style={{ fontSize: 12, color: '#9ca3af', marginTop: 12, display: 'block' }}>
+              {gradeTrend.length === 1 
+                ? "Performance trend from your first graded task."
+                : `Performance trend across ${gradeTrend.length} graded tasks.`
+              }
+            </span>
+          )}
         </div>
 
         <div className="glass-card" style={{ flex: 1 }}>

@@ -53,6 +53,7 @@ class SubmissionSerializer(serializers.ModelSerializer):
     student_name = serializers.SerializerMethodField()
     student_roll = serializers.CharField(source='student.roll_number', read_only=True)
     task_title = serializers.CharField(source='task.title', read_only=True)
+    task_max_marks = serializers.IntegerField(source='task.max_marks', read_only=True)
 
     class Meta:
         model = Submission
