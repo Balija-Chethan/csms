@@ -16,7 +16,7 @@ export default function BatchSelection({ API_URL, token, onEnrollmentRequested }
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_URL}/batches/`);
+      const res = await fetch(`${API_URL}/batches/?_cb=${Date.now()}`);
       if (!res.ok) throw new Error("Failed to fetch available batches");
       const data = await res.json();
       setBatches(data);

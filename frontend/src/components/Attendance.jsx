@@ -9,7 +9,7 @@ export default function Attendance({ API_URL, token }) {
   const fetchLogs = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/student/attendance/`, {
+      const res = await fetch(`${API_URL}/student/attendance/?_cb=${Date.now()}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
@@ -58,7 +58,7 @@ export default function Attendance({ API_URL, token }) {
   const totalTracked = logs.length;
   const percentage = totalTracked - leaveDays > 0 
     ? Math.round((presentDays / (totalTracked - leaveDays)) * 100) 
-    : 100;
+    : 0;
 
   if (loading) return <div style={{ color: '#fff' }}>Loading attendance tracking...</div>;
 

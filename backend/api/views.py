@@ -193,10 +193,7 @@ def student_dashboard(request):
         })
 
     # 1. Tasks Completion Summary
-    tasks = Task.objects.filter(batch=batch) if batch else Task.objects.all()
-    if not tasks.exists():
-        tasks = Task.objects.all()
-
+    tasks = Task.objects.filter(batch=batch) if batch else Task.objects.none()
     total_tasks = tasks.count()
     user_subs = Submission.objects.filter(student=user)
     completed_submissions = user_subs.count()
@@ -218,7 +215,8 @@ def student_dashboard(request):
     present_days = logs.filter(status='present').count()
     absent_days = logs.filter(status='absent').count()
     leave_days = logs.filter(status='leave').count()
-    attendance_rate = round((present_days / (total_days - leave_days)) * 100) if (total_days - leave_days) > 0 else 100
+    working_days = present_days + absent_days
+    attendance_rate = round((present_days / working_days) * 100) if working_days > 0 else 0
 
     # 4. Checkin Status Today
     today = date.today()
@@ -245,12 +243,14 @@ def student_dashboard(request):
         else:
             recent_activities.append({
                 'type': 'task_submitted',
-                'title': f"Task Submitted: {sub.task.title}",
+                'title': f"Task Submitting: {sub.task.title}",
                 'detail': "Awaiting review",
                 'timestamp': sub.submitted_at
             })
     
     recent_activities.sort(key=lambda x: x['timestamp'], reverse=True)
+
+    mock_drives = MockDriveResult.objects.filter(student=user).order_by('-date')
 
     return Response({
         'student': UserSerializer(user).data,
@@ -279,7 +279,8 @@ def student_dashboard(request):
             'sessionDuration': session_duration,
             'logDate': today.strftime("%Y-%m-%d")
         },
-        'recentActivities': recent_activities[:5]
+        'recentActivities': recent_activities[:5],
+        'mockDrives': MockDriveResultSerializer(mock_drives, many=True).data
     })
 
 
@@ -291,9 +292,8 @@ def student_checkin(request):
     today = date.today()
     action = request.data.get('action') # 'checkin' or 'checkout'
 
-    log, created = AttendanceLog.objects.get_or_create(student=user, date=today)
-
     if action == 'checkin':
+        log, created = AttendanceLog.objects.get_or_create(student=user, date=today)
         if log.check_in and log.check_out:
             log.check_in = timezone.now()
             log.check_out = None
@@ -310,7 +310,8 @@ def student_checkin(request):
         return Response({'status': 'Checked in successfully', 'time': log.check_in})
         
     elif action == 'checkout':
-        if not log.check_in:
+        log = AttendanceLog.objects.filter(student=user, date=today).first()
+        if not log or not log.check_in:
             return Response({'error': 'You must check in first before checking out'}, status=status.HTTP_400_BAD_REQUEST)
         if log.check_out:
             return Response({'error': 'Already checked out today'}, status=status.HTTP_400_BAD_REQUEST)
@@ -348,8 +349,6 @@ def student_tasks(request):
 
     if request.method == 'GET':
         tasks = Task.objects.filter(batch=batch).order_by('-due_date') if batch else Task.objects.none()
-        if not tasks.exists():
-            tasks = Task.objects.all().order_by('-due_date')
 
         serialized_tasks = []
         for task in tasks:
@@ -403,9 +402,12 @@ def student_leetcode(request):
     active_time = local_now - timedelta(hours=9)
     active_date = active_time.date()
 
-    
+    # Get student batch approved date
+    enrollment = BatchEnrollment.objects.filter(student=user, status='approved').first()
+    approved_date = enrollment.approved_at.date() if (enrollment and enrollment.approved_at) else user.date_joined.date()
+
     if request.method == 'GET':
-        challenges = LeetcodeChallenge.objects.all().order_by('available_date', 'day_number')
+        challenges = LeetcodeChallenge.objects.all().order_by('day_number')
         challenge_ids = [ch.id for ch in challenges]
         
         submissions_dict = {
@@ -413,7 +415,14 @@ def student_leetcode(request):
             for sub in LeetcodeSubmission.objects.filter(student=user, challenge_id__in=challenge_ids)
         }
         
-        past_challenges = [ch for ch in challenges if ch.available_date <= active_date]
+        # Calculate streak based on unlocked challenges only
+        unlocked_challenges = []
+        for ch in challenges:
+            unlock_date = approved_date + timedelta(days=ch.day_number - 1)
+            if active_date >= unlock_date:
+                unlocked_challenges.append(ch)
+
+        past_challenges = list(unlocked_challenges)
         past_challenges.reverse()
         
         streak = 0
@@ -421,7 +430,10 @@ def student_leetcode(request):
             sub = submissions_dict.get(ch.id)
             has_solved = sub and sub.status == 'completed'
             
-            if ch.available_date == active_date:
+            unlock_date = approved_date + timedelta(days=ch.day_number - 1)
+            is_active = unlock_date == active_date
+            
+            if is_active:
                 if has_solved:
                     streak += 1
             else:
@@ -436,30 +448,28 @@ def student_leetcode(request):
             sub = submissions_dict.get(ch.id)
             has_solved = sub and sub.status == 'completed'
             
-            is_active = ch.available_date == active_date
-            is_unlocked = True
-            visible = True
+            unlock_date = approved_date + timedelta(days=ch.day_number - 1)
+            is_active = unlock_date == active_date
+            is_unlocked = active_date >= unlock_date
             
-            if visible:
-                if has_solved:
-                    solved_count += 1
-                
-                # Deadline is 9:00 AM of the day after available_date
-                deadline_dt = timezone.make_aware(
-                    datetime.combine(ch.available_date + timedelta(days=1), datetime.min.time().replace(hour=9))
-                )
-                
-                serialized.append({
-                    'id': ch.id,
-                    'title': ch.title,
-                    'url': ch.url,
-                    'available_date': ch.available_date,
-                    'day_number': ch.day_number,
-                    'deadline': deadline_dt,
-                    'is_unlocked': is_unlocked,
-                    'is_today': is_active,
-                    'submission': LeetcodeSubmissionSerializer(sub).data if sub else None
-                })
+            if has_solved:
+                solved_count += 1
+            
+            deadline_dt = timezone.make_aware(
+                datetime.combine(unlock_date + timedelta(days=1), datetime.min.time().replace(hour=9))
+            )
+            
+            serialized.append({
+                'id': ch.id,
+                'title': ch.title,
+                'url': ch.url if is_unlocked else '',
+                'available_date': str(unlock_date),
+                'day_number': ch.day_number,
+                'deadline': deadline_dt,
+                'is_unlocked': is_unlocked,
+                'is_today': is_active,
+                'submission': LeetcodeSubmissionSerializer(sub).data if sub else None
+            })
         
         return Response({
             'challenges': serialized,
@@ -480,19 +490,11 @@ def student_leetcode(request):
         except LeetcodeChallenge.DoesNotExist:
             return Response({'error': 'Challenge not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Enforce active submission window: must be the current active challenge
-        try:
-            from zoneinfo import ZoneInfo
-            local_now = timezone.now().astimezone(ZoneInfo('Asia/Kolkata'))
-        except Exception:
-            local_now = timezone.now() + timedelta(hours=5.5)
+        # Calculate student specific unlock date
+        unlock_date = approved_date + timedelta(days=ch.day_number - 1)
 
-        active_time = local_now - timedelta(hours=9)
-        active_date = active_time.date()
-
-        if ch.available_date != active_date:
-            return Response({'error': 'This challenge window is closed. You can only submit today\'s active challenge.'}, status=status.HTTP_403_FORBIDDEN)
-
+        if active_date < unlock_date:
+            return Response({'error': 'This problem has not been unlocked yet.'}, status=status.HTTP_403_FORBIDDEN)
 
         sub, created = LeetcodeSubmission.objects.get_or_create(challenge=ch, student=user, defaults={'submission_url': submission_url})
         if not created:
@@ -524,7 +526,10 @@ def student_notes(request):
 
     user = request.user
     batch = get_student_batch(user)
-    notes = StudyNote.objects.filter(Q(batch=batch) | Q(category='global') | Q(batch__isnull=True)).order_by('-date_shared')
+    if batch:
+        notes = StudyNote.objects.filter(Q(batch=batch) | Q(category='global')).order_by('-date_shared')
+    else:
+        notes = StudyNote.objects.filter(category='global').order_by('-date_shared')
     return Response(StudyNoteSerializer(notes, many=True).data)
 
 
@@ -590,12 +595,6 @@ def student_leaves(request):
             reason=reason,
             pdf_url=pdf_url,
             status='pending'
-        )
-        
-        # Mark attendance log status to Leave
-        AttendanceLog.objects.update_or_create(
-            student=user, date=leave_date,
-            defaults={'status': 'leave', 'check_in': None, 'check_out': None, 'total_time': None}
         )
 
         return Response(LeaveRequestSerializer(leave).data, status=status.HTTP_201_CREATED)
@@ -836,10 +835,15 @@ def admin_resolve_leave(request):
     leave.admin_response = admin_response
     leave.save()
 
-    # Update corresponding AttendanceLog status
-    AttendanceLog.objects.filter(student=leave.student, date=leave.date).update(
-        status='leave' if status_action == 'approved' else 'absent'
+    # Update or create corresponding AttendanceLog status
+    attendance_log, created = AttendanceLog.objects.get_or_create(
+        student=leave.student,
+        date=leave.date,
+        defaults={'status': 'leave' if status_action == 'approved' else 'absent'}
     )
+    if not created:
+        attendance_log.status = 'leave' if status_action == 'approved' else 'absent'
+        attendance_log.save()
 
     return Response(LeaveRequestSerializer(leave).data)
 

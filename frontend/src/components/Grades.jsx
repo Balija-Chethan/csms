@@ -9,7 +9,7 @@ export default function Grades({ API_URL, token }) {
   useEffect(() => {
     const fetchGrades = async () => {
       try {
-        const res = await fetch(`${API_URL}/student/grades/`, {
+        const res = await fetch(`${API_URL}/student/grades/?_cb=${Date.now()}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const resData = await res.json();
@@ -77,50 +77,56 @@ export default function Grades({ API_URL, token }) {
         </div>
       ) : (
         <div style={styles.grid}>
-          {data.mockDrives.map(drive => (
-            <div key={drive.id} className="glass-card" style={styles.mockCard}>
-              <div style={styles.mockHeader}>
-                <div>
-                  <h3 style={styles.driveTitle}>{drive.test_name}</h3>
-                  <span style={styles.date}>Drive Date: {drive.date}</span>
+          {data.mockDrives && data.mockDrives.length > 0 ? (
+            data.mockDrives.map(drive => (
+              <div key={drive.id} className="glass-card" style={styles.mockCard}>
+                <div style={styles.mockHeader}>
+                  <div>
+                    <h3 style={styles.driveTitle}>{drive.test_name}</h3>
+                    <span style={styles.date}>Drive Date: {drive.date}</span>
+                  </div>
+                  <div style={styles.gradeBadge}>
+                    <div style={styles.gradeCircle}>{drive.grade}</div>
+                    <div style={{ fontSize: 11, textAlign: 'center', marginTop: 4 }}>GRADE</div>
+                  </div>
                 </div>
-                <div style={styles.gradeBadge}>
-                  <div style={styles.gradeCircle}>{drive.grade}</div>
-                  <div style={{ fontSize: 11, textAlign: 'center', marginTop: 4 }}>GRADE</div>
-                </div>
-              </div>
 
-              <div style={styles.breakdown}>
-                <h4 style={styles.breakdownHeader}>Marks Breakdown</h4>
-                
-                <div style={styles.breakdownRow}>
-                  <span>MCQ - Aptitude</span>
-                  <strong>{drive.aptitude_score} / 150</strong>
-                </div>
-                <div style={styles.breakdownRow}>
-                  <span>MCQ - Tech</span>
-                  <strong>{drive.tech_score} / 300</strong>
-                </div>
-                <div style={styles.breakdownRow}>
-                  <span>Coding Round</span>
-                  <strong>{drive.coding_score} / 400</strong>
-                </div>
-                <div style={styles.breakdownRow}>
-                  <span>Tech HR Marks</span>
-                  <strong>{drive.tech_hr_score} / 50</strong>
-                </div>
-                <div style={styles.breakdownRow}>
-                  <span>HR Marks</span>
-                  <strong>{drive.hr_score} / 100</strong>
-                </div>
-                
-                <div style={styles.totalRow}>
-                  <span>Percentage Score</span>
-                  <strong>{drive.total_score / 10}% ({drive.total_score} / 1000)</strong>
+                <div style={styles.breakdown}>
+                  <h4 style={styles.breakdownHeader}>Marks Breakdown</h4>
+                  
+                  <div style={styles.breakdownRow}>
+                    <span>MCQ - Aptitude</span>
+                    <strong>{drive.aptitude_score} / 150</strong>
+                  </div>
+                  <div style={styles.breakdownRow}>
+                    <span>MCQ - Tech</span>
+                    <strong>{drive.tech_score} / 300</strong>
+                  </div>
+                  <div style={styles.breakdownRow}>
+                    <span>Coding Round</span>
+                    <strong>{drive.coding_score} / 400</strong>
+                  </div>
+                  <div style={styles.breakdownRow}>
+                    <span>Tech HR Marks</span>
+                    <strong>{drive.tech_hr_score} / 50</strong>
+                  </div>
+                  <div style={styles.breakdownRow}>
+                    <span>HR Marks</span>
+                    <strong>{drive.hr_score} / 100</strong>
+                  </div>
+                  
+                  <div style={styles.totalRow}>
+                    <span>Percentage Score</span>
+                    <strong>{drive.total_score / 10}% ({drive.total_score} / 1000)</strong>
+                  </div>
                 </div>
               </div>
+            ))
+          ) : (
+            <div style={{ padding: '40px 0', textAlign: 'center', color: '#9ca3af', width: '100%', gridColumn: '1 / -1' }}>
+              No mock drive attempted yet.
             </div>
-          ))}
+          )}
         </div>
       )}
     </div>

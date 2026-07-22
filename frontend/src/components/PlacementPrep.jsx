@@ -10,7 +10,7 @@ export default function PlacementPrep({ API_URL, token }) {
   useEffect(() => {
     const fetchPlacementData = async () => {
       try {
-        const res = await fetch(`${API_URL}/student/placement-prep/`, {
+        const res = await fetch(`${API_URL}/student/placement-prep/?_cb=${Date.now()}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await res.json();

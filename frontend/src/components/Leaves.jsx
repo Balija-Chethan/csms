@@ -12,7 +12,7 @@ export default function Leaves({ API_URL, token }) {
 
   const fetchLeaves = async () => {
     try {
-      const res = await fetch(`${API_URL}/student/leaves/`, {
+      const res = await fetch(`${API_URL}/student/leaves/?_cb=${Date.now()}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();

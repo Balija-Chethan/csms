@@ -7,7 +7,7 @@ export default function Leaderboard({ API_URL, token }) {
 
   const fetchLeaderboard = async () => {
     try {
-      const res = await fetch(`${API_URL}/student/leaderboard/`, {
+      const res = await fetch(`${API_URL}/student/leaderboard/?_cb=${Date.now()}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();

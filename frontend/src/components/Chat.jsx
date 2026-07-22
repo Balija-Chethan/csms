@@ -10,7 +10,7 @@ export default function Chat({ API_URL, token, batchName }) {
 
   const fetchMessages = async () => {
     try {
-      const res = await fetch(`${API_URL}/student/chat/`, {
+      const res = await fetch(`${API_URL}/student/chat/?_cb=${Date.now()}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();

@@ -9,7 +9,8 @@ export default function Dashboard({ data, refreshData, API_URL, token, setActive
     leaderboard = { rank: 'N/A' }, 
     attendance = { totalDays: 0, rate: 0, present: 0, leave: 0 }, 
     checkInState = { isCheckedIn: false, isCheckedOut: false, sessionDuration: 0 }, 
-    recentActivities = [] 
+    recentActivities = [],
+    mockDrives = []
   } = data || {};
   const [checkingIn, setCheckingIn] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(checkInState ? (checkInState.sessionDuration || 0) : 0);
@@ -211,23 +212,33 @@ export default function Dashboard({ data, refreshData, API_URL, token, setActive
           <div style={styles.widgetHeader}>
             <h3 style={styles.widgetTitle}>Mock Placement Drives</h3>
           </div>
-          <div style={styles.insightsContent}>
-            <div style={styles.insightRow}>
-              <span>Latest Test:</span>
-              <strong>Mock Test 3</strong>
+          {mockDrives && mockDrives.length > 0 ? (
+            <div style={styles.insightsContent}>
+              <div style={styles.insightRow}>
+                <span>Latest Test:</span>
+                <strong>{mockDrives[0].test_name}</strong>
+              </div>
+              <div style={styles.insightRow}>
+                <span>Total Score:</span>
+                <strong style={{ color: '#f59e0b' }}>
+                  {(mockDrives[0].total_score / 10).toFixed(1)}% (Grade: {mockDrives[0].grade})
+                </strong>
+              </div>
+              <div style={styles.insightRow}>
+                <span>Attempts:</span>
+                <strong>{mockDrives.length} Attempt(s)</strong>
+              </div>
+              <button className="btn-secondary" style={{ marginTop: 16, width: '100%', justifyContent: 'center' }}>
+                View Test Details
+              </button>
             </div>
-            <div style={styles.insightRow}>
-              <span>Total Score:</span>
-              <strong style={{ color: '#f59e0b' }}>75.7% (Grade: C)</strong>
+          ) : (
+            <div style={styles.insightsContent}>
+              <div style={{ padding: '24px 0', textAlign: 'center', color: '#9ca3af', fontWeight: '500' }}>
+                No attempts yet
+              </div>
             </div>
-            <div style={styles.insightRow}>
-              <span>Available Drives:</span>
-              <strong>1 Registered</strong>
-            </div>
-            <button className="btn-secondary" style={{ marginTop: 16, width: '100%', justifyContent: 'center' }}>
-              View Test Details
-            </button>
-          </div>
+          )}
         </div>
 
         {/* Widget 5: Attendance */}

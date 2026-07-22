@@ -9,7 +9,7 @@ export default function LeetCode({ API_URL, token }) {
 
   const fetchLeetcodeData = async () => {
     try {
-      const res = await fetch(`${API_URL}/student/leetcode/`, {
+      const res = await fetch(`${API_URL}/student/leetcode/?_cb=${Date.now()}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const resData = await res.json();
@@ -48,6 +48,29 @@ export default function LeetCode({ API_URL, token }) {
       alert(err.message);
     } finally {
       setSubmitting(prev => ({ ...prev, [challengeId]: false }));
+    }
+  };
+
+  const getLockMessage = (availDateStr) => {
+    try {
+      const availDate = new Date(availDateStr);
+      const today = new Date();
+      availDate.setHours(0, 0, 0, 0);
+      today.setHours(0, 0, 0, 0);
+      
+      const diffTime = availDate - today;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 1) {
+        return "Unlocks in 1 day";
+      } else if (diffDays > 1 && diffDays <= 7) {
+        return `Unlocks in ${diffDays} days`;
+      } else {
+        const options = { month: 'long', day: 'numeric' };
+        return `Available on ${availDate.toLocaleDateString('en-US', options)}`;
+      }
+    } catch (err) {
+      return `Unlocks on ${availDateStr}`;
     }
   };
 
@@ -158,68 +181,103 @@ export default function LeetCode({ API_URL, token }) {
             return (
               <div 
                 key={ch.id} 
-                className={`glass-card ${isToday ? 'active-today-border' : ''} ${!isUnlocked ? 'locked-card-style' : ''}`}
-                style={styles.card}
+                className={`glass-card ${isToday ? 'active-today-border' : ''}`}
+                style={{
+                  ...styles.card,
+                  position: 'relative',
+                  background: isUnlocked ? (isCompleted ? 'rgba(16, 185, 129, 0.03)' : 'rgba(16, 185, 129, 0.07)') : 'rgba(75, 85, 99, 0.1)',
+                  borderColor: isUnlocked ? '#10b981' : 'rgba(75, 85, 99, 0.4)',
+                  overflow: 'hidden'
+                }}
               >
-                <div style={styles.cardHeader}>
-                  <span className={`day-badge ${isUnlocked ? 'day-badge-open' : 'day-badge-locked'}`}>
-                    Day {ch.day_number}
-                  </span>
-                  
-                  {isCompleted ? (
-                    <span className="badge badge-success"><CheckCircle2 size={12} /> Solved</span>
-                  ) : isUnlocked ? (
-                    <span className="badge badge-warning">Active</span>
-                  ) : (
-                    <span className="badge badge-danger" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      <Lock size={12} /> Locked
+                {/* Inside card, blurred if locked */}
+                <div style={{ 
+                  filter: isUnlocked ? 'none' : 'blur(4px)', 
+                  pointerEvents: isUnlocked ? 'auto' : 'none', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  height: '100%', 
+                  flex: 1 
+                }}>
+                  <div style={styles.cardHeader}>
+                    <span className={`day-badge ${isUnlocked ? 'day-badge-open' : 'day-badge-locked'}`} style={{ background: isUnlocked ? 'rgba(16, 185, 129, 0.2)' : 'rgba(75, 85, 99, 0.2)', color: isUnlocked ? '#10b981' : '#9ca3af' }}>
+                      Day {ch.day_number}
                     </span>
+                    
+                    {isCompleted ? (
+                      <span className="badge badge-success"><CheckCircle2 size={12} /> Solved</span>
+                    ) : isUnlocked ? (
+                      <span className="badge badge-warning">Active</span>
+                    ) : (
+                      <span className="badge badge-danger" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <Lock size={12} /> Locked
+                      </span>
+                    )}
+                  </div>
+
+                  <h4 style={styles.title}>{ch.title}</h4>
+
+                  {isUnlocked && (
+                    <>
+                      <a href={ch.url} target="_blank" rel="noopener noreferrer" style={styles.problemLink}>
+                        View on LeetCode <ExternalLink size={13} />
+                      </a>
+
+                      <div style={styles.dateMeta}>Available Since: {ch.available_date}</div>
+
+                      {isCompleted ? (
+                        <div style={styles.subStatus}>
+                          <span style={{ fontSize: 13, color: '#34d399', fontWeight: '600' }}>Completed</span>
+                          <a href={ch.submission.submission_url} target="_blank" rel="noopener noreferrer" style={styles.subLink}>
+                            View Link <ExternalLink size={12} />
+                          </a>
+                        </div>
+                      ) : (
+                        <div style={styles.submitSection}>
+                          <input 
+                            type="url" 
+                            className="custom-input" 
+                            placeholder="https://leetcode.com/.../submissions/..."
+                            value={submitUrl[ch.id] || ''}
+                            onChange={e => setSubmitUrl(prev => ({ ...prev, [ch.id]: e.target.value }))}
+                            style={{ marginBottom: 10, fontSize: 12 }}
+                          />
+                          <button 
+                            className="btn-primary" 
+                            onClick={() => handleSubmit(ch.id)}
+                            disabled={submitting[ch.id]}
+                            style={{ width: '100%', justifyContent: 'center', fontSize: 13, padding: '8px 12px' }}
+                          >
+                            {submitting[ch.id] ? 'Submitting...' : 'Submit URL'} <Send size={13} />
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
 
-                <h4 style={styles.title}>{ch.title}</h4>
-
-                {isUnlocked ? (
-                  <>
-                    <a href={ch.url} target="_blank" rel="noopener noreferrer" style={styles.problemLink}>
-                      View on LeetCode <ExternalLink size={13} />
-                    </a>
-
-                    <div style={styles.dateMeta}>Available Since: {ch.available_date}</div>
-
-                    {isCompleted ? (
-                      <div style={styles.subStatus}>
-                        <span style={{ fontSize: 13, color: '#34d399', fontWeight: '600' }}>Completed</span>
-                        <a href={ch.submission.submission_url} target="_blank" rel="noopener noreferrer" style={styles.subLink}>
-                          View Link <ExternalLink size={12} />
-                        </a>
-                      </div>
-                    ) : (
-                      <div style={styles.submitSection}>
-                        <input 
-                          type="url" 
-                          className="custom-input" 
-                          placeholder="https://leetcode.com/.../submissions/..."
-                          value={submitUrl[ch.id] || ''}
-                          onChange={e => setSubmitUrl(prev => ({ ...prev, [ch.id]: e.target.value }))}
-                          style={{ marginBottom: 10, fontSize: 12 }}
-                        />
-                        <button 
-                          className="btn-primary" 
-                          onClick={() => handleSubmit(ch.id)}
-                          disabled={submitting[ch.id]}
-                          style={{ width: '100%', justifyContent: 'center', fontSize: 13, padding: '8px 12px' }}
-                        >
-                          {submitting[ch.id] ? 'Submitting...' : 'Submit URL'} <Send size={13} />
-                        </button>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div style={styles.lockedBox}>
-                    <Lock size={28} style={{ color: '#6b7280', margin: '12px 0 6px 0' }} />
-                    <div style={styles.lockMsg}>Unlocks on {ch.available_date}</div>
-                    <div style={styles.lockSubMsg}>1 problem released per day</div>
+                {/* If locked, show absolute lock overlay */}
+                {!isUnlocked && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 0, left: 0, right: 0, bottom: 0,
+                    display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center',
+                    padding: 20, textAlign: 'center',
+                    background: 'rgba(15, 23, 42, 0.5)',
+                    zIndex: 2
+                  }}>
+                    <Lock size={32} style={{ color: '#9ca3af', marginBottom: 8 }} />
+                    <h4 style={{ ...styles.title, margin: 0, opacity: 0.5 }}>Day {ch.day_number}: {ch.title}</h4>
+                    <div style={{ fontSize: 13, fontWeight: 'bold', color: '#f3f4f6', marginTop: 8 }}>
+                      {getLockMessage(ch.available_date)}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+                      1 problem released per day
+                    </div>
+                    <button className="btn-primary" disabled style={{ marginTop: 16, width: '100%', justifyContent: 'center', background: 'rgba(75, 85, 99, 0.4)', color: '#9ca3af', border: '1px solid rgba(255,255,255,0.05)', cursor: 'not-allowed' }}>
+                      Locked
+                    </button>
                   </div>
                 )}
               </div>

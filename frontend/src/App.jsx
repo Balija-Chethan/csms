@@ -51,7 +51,7 @@ export default function App() {
   const fetchEnrollmentStatus = async () => {
     if (!token || !user || user.role === 'admin') return;
     try {
-      const res = await fetch(`${API_URL}/student/enrollment/`, {
+      const res = await fetch(`${API_URL}/student/enrollment/?_cb=${Date.now()}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -101,7 +101,7 @@ export default function App() {
     if (!token) return;
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/student/dashboard/`, {
+      const res = await fetch(`${API_URL}/student/dashboard/?_cb=${Date.now()}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

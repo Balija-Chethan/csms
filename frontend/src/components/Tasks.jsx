@@ -9,7 +9,7 @@ export default function Tasks({ API_URL, token }) {
 
   const fetchTasks = async () => {
     try {
-      const res = await fetch(`${API_URL}/student/tasks/`, {
+      const res = await fetch(`${API_URL}/student/tasks/?_cb=${Date.now()}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();

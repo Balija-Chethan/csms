@@ -49,6 +49,16 @@ def get_mongo_db():
     return _mongo_db
 
 
+def update_sync_meta():
+    """Update the global last_write timestamp in MongoDB to notify other instances of updates."""
+    db = get_mongo_db()
+    if db is not None:
+        try:
+            db['sync_meta'].replace_one({'_id': 'last_write'}, {'timestamp': time.time()}, upsert=True)
+        except Exception as e:
+            print(f"[MongoDB Error] Failed to update sync_meta: {e}")
+
+
 def sync_to_mongo(collection_name, doc_id, data):
     """Save or update a document in a MongoDB collection."""
     db = get_mongo_db()
@@ -57,6 +67,7 @@ def sync_to_mongo(collection_name, doc_id, data):
     try:
         data['_id'] = str(doc_id)
         db[collection_name].replace_one({'_id': str(doc_id)}, data, upsert=True)
+        update_sync_meta()
     except Exception as e:
         print(f"[MongoDB Error] Failed to sync document to {collection_name}: {e}")
 
@@ -68,6 +79,7 @@ def delete_from_mongo(collection_name, doc_id):
         return
     try:
         db[collection_name].delete_one({'_id': str(doc_id)})
+        update_sync_meta()
     except Exception as e:
         print(f"[MongoDB Error] Failed to delete document from {collection_name}: {e}")
 
@@ -87,15 +99,23 @@ def get_all_from_mongo(collection_name):
 def restore_from_mongo(force=False):
     """Restore all data from MongoDB Atlas into active Django ORM models on startup/login."""
     global _last_restore_time
-    now = time.time()
-    if not force and (now - _last_restore_time) < RESTORE_THROTTLE_SECONDS:
-        return
-    _last_restore_time = now
 
     db = get_mongo_db()
     if db is None:
         return
-    
+
+    # 0. Sync Metadata Check
+    try:
+        meta = db['sync_meta'].find_one({'_id': 'last_write'})
+        last_write_time = meta.get('timestamp', 0) if meta else 0
+    except Exception as e:
+        print(f"[MongoDB Error] Failed to fetch sync_meta timestamp: {e}")
+        last_write_time = 0
+
+    if not force and _last_restore_time > 0 and last_write_time <= _last_restore_time:
+        # SQLite is already up-to-date with MongoDB
+        return
+
     try:
         from api.models import (
             User, Batch, BatchEnrollment, Task, Submission,
@@ -103,7 +123,44 @@ def restore_from_mongo(force=False):
             MockDriveResult, AttendanceLog, LeaveRequest, ChatMessage,
             PlacementCompany, PlacementRound, PlacementResource
         )
-        from datetime import datetime, date
+        from datetime import datetime, date, timedelta
+        from django.utils import timezone
+
+        def parse_date(date_str):
+            if not date_str:
+                return None
+            try:
+                return datetime.strptime(str(date_str).split(' ')[0].split('T')[0], "%Y-%m-%d").date()
+            except Exception:
+                return None
+
+        def parse_datetime(dt_str):
+            if not dt_str:
+                return None
+            try:
+                clean_str = str(dt_str).replace('T', ' ').split('.')[0]
+                dt = datetime.strptime(clean_str[:19], "%Y-%m-%d %H:%M:%S")
+                return timezone.make_aware(dt)
+            except Exception:
+                try:
+                    dt = datetime.strptime(str(dt_str).split(' ')[0], "%Y-%m-%d")
+                    return timezone.make_aware(dt)
+                except Exception:
+                    return None
+
+        def parse_duration(dur_str):
+            if not dur_str:
+                return None
+            try:
+                parts = dur_str.split(':')
+                if len(parts) == 3:
+                    hours = float(parts[0])
+                    minutes = float(parts[1])
+                    seconds = float(parts[2])
+                    return timedelta(hours=hours, minutes=minutes, seconds=seconds)
+            except Exception:
+                pass
+            return None
 
         # 1. Restore Users
         mongo_users = list(db['users'].find({}))
@@ -326,6 +383,208 @@ def restore_from_mongo(force=False):
                         res_obj.id = int(raw_res_id)
                     res_obj.save()
 
+        # 8. Restore Submissions
+        mongo_submissions = list(db['submissions'].find({}))
+        for s in mongo_submissions:
+            raw_id = s.get('_id') or s.get('id')
+            task_id = s.get('task_id')
+            student_id = s.get('student_id')
+            if task_id and student_id:
+                try:
+                    task = Task.objects.filter(id=task_id).first()
+                    student = User.objects.filter(id=student_id).first()
+                    if task and student:
+                        sub = Submission.objects.filter(task=task, student=student).first()
+                        if not sub:
+                            sub = Submission(
+                                task=task,
+                                student=student,
+                                github_url=s.get('github_url', ''),
+                                grade=s.get('grade'),
+                                feedback=s.get('feedback'),
+                                graded_at=parse_datetime(s.get('graded_at'))
+                            )
+                            if str(raw_id).isdigit():
+                                sub.id = int(raw_id)
+                        else:
+                            sub.github_url = s.get('github_url', sub.github_url)
+                            sub.grade = s.get('grade', sub.grade)
+                            sub.feedback = s.get('feedback', sub.feedback)
+                            sub.graded_at = parse_datetime(s.get('graded_at')) or sub.graded_at
+                        sub.save()
+                        sub_time = parse_datetime(s.get('submitted_at'))
+                        if sub_time:
+                            Submission.objects.filter(id=sub.id).update(submitted_at=sub_time)
+                except Exception:
+                    pass
+
+        # 9. Restore LeetcodeSubmissions
+        mongo_lc_submissions = list(db['leetcode_submissions'].find({}))
+        for ls in mongo_lc_submissions:
+            raw_id = ls.get('_id') or ls.get('id')
+            challenge_id = ls.get('challenge_id')
+            student_id = ls.get('student_id')
+            if challenge_id and student_id:
+                try:
+                    challenge = LeetcodeChallenge.objects.filter(id=challenge_id).first()
+                    student = User.objects.filter(id=student_id).first()
+                    if challenge and student:
+                        sub = LeetcodeSubmission.objects.filter(challenge=challenge, student=student).first()
+                        if not sub:
+                            sub = LeetcodeSubmission(
+                                challenge=challenge,
+                                student=student,
+                                submission_url=ls.get('submission_url', ''),
+                                status=ls.get('status', 'completed')
+                            )
+                            if str(raw_id).isdigit():
+                                sub.id = int(raw_id)
+                        else:
+                            sub.submission_url = ls.get('submission_url', sub.submission_url)
+                            sub.status = ls.get('status', sub.status)
+                        sub.save()
+                        sub_time = parse_datetime(ls.get('submitted_at'))
+                        if sub_time:
+                            LeetcodeSubmission.objects.filter(id=sub.id).update(submitted_at=sub_time)
+                except Exception:
+                    pass
+
+        # 10. Restore MockDriveResults
+        mongo_mock_results = list(db['mock_results'].find({}))
+        for mr in mongo_mock_results:
+            raw_id = mr.get('_id') or mr.get('id')
+            student_id = mr.get('student_id')
+            if student_id:
+                try:
+                    student = User.objects.filter(id=student_id).first()
+                    if student:
+                        res = MockDriveResult.objects.filter(student=student, test_name=mr.get('test_name')).first()
+                        if not res:
+                            res = MockDriveResult(
+                                student=student,
+                                test_name=mr.get('test_name'),
+                                aptitude_score=mr.get('aptitude_score', 0),
+                                tech_score=mr.get('tech_score', 0),
+                                coding_score=mr.get('coding_score', 0),
+                                tech_hr_score=mr.get('tech_hr_score', 0),
+                                hr_score=mr.get('hr_score', 0),
+                                total_score=mr.get('total_score', 0),
+                                grade=mr.get('grade', 'C'),
+                                date=parse_date(mr.get('date')) or date.today()
+                            )
+                            if str(raw_id).isdigit():
+                                res.id = int(raw_id)
+                        else:
+                            res.aptitude_score = mr.get('aptitude_score', res.aptitude_score)
+                            res.tech_score = mr.get('tech_score', res.tech_score)
+                            res.coding_score = mr.get('coding_score', res.coding_score)
+                            res.tech_hr_score = mr.get('tech_hr_score', res.tech_hr_score)
+                            res.hr_score = mr.get('hr_score', res.hr_score)
+                            res.total_score = mr.get('total_score', res.total_score)
+                            res.grade = mr.get('grade', res.grade)
+                            res.date = parse_date(mr.get('date')) or res.date
+                        res.save()
+                except Exception:
+                    pass
+
+        # 11. Restore AttendanceLogs
+        mongo_attendance = list(db['attendance_logs'].find({}))
+        for al in mongo_attendance:
+            raw_id = al.get('_id') or al.get('id')
+            student_id = al.get('student_id')
+            log_date = parse_date(al.get('date'))
+            if student_id and log_date:
+                try:
+                    student = User.objects.filter(id=student_id).first()
+                    if student:
+                        log = AttendanceLog.objects.filter(student=student, date=log_date).first()
+                        if not log:
+                            log = AttendanceLog(
+                                student=student,
+                                date=log_date,
+                                check_in=parse_datetime(al.get('check_in')),
+                                check_out=parse_datetime(al.get('check_out')),
+                                total_time=parse_duration(al.get('total_time')),
+                                status=al.get('status', 'present')
+                            )
+                            if str(raw_id).isdigit():
+                                log.id = int(raw_id)
+                        else:
+                            log.check_in = parse_datetime(al.get('check_in')) or log.check_in
+                            log.check_out = parse_datetime(al.get('check_out')) or log.check_out
+                            log.total_time = parse_duration(al.get('total_time')) or log.total_time
+                            log.status = al.get('status', log.status)
+                        log.save()
+                except Exception:
+                    pass
+
+        # 12. Restore LeaveRequests
+        mongo_leaves = list(db['leave_requests'].find({}))
+        for lr in mongo_leaves:
+            raw_id = lr.get('_id') or lr.get('id')
+            student_id = lr.get('student_id')
+            leave_date = parse_date(lr.get('date'))
+            if student_id and leave_date:
+                try:
+                    student = User.objects.filter(id=student_id).first()
+                    if student:
+                        leave = LeaveRequest.objects.filter(student=student, date=leave_date).first()
+                        if not leave:
+                            leave = LeaveRequest(
+                                student=student,
+                                leave_type=lr.get('leave_type'),
+                                date=leave_date,
+                                reason=lr.get('reason', ''),
+                                pdf_url=lr.get('pdf_url', ''),
+                                status=lr.get('status', 'pending'),
+                                admin_response=lr.get('admin_response', '')
+                            )
+                            if str(raw_id).isdigit():
+                                leave.id = int(raw_id)
+                        else:
+                            leave.leave_type = lr.get('leave_type', leave.leave_type)
+                            leave.reason = lr.get('reason', leave.reason)
+                            leave.pdf_url = lr.get('pdf_url', leave.pdf_url)
+                            leave.status = lr.get('status', leave.status)
+                            leave.admin_response = lr.get('admin_response', leave.admin_response)
+                        leave.save()
+                        created_time = parse_datetime(lr.get('created_at'))
+                        if created_time:
+                            LeaveRequest.objects.filter(id=leave.id).update(created_at=created_time)
+                except Exception:
+                    pass
+
+        # 13. Restore ChatMessages
+        mongo_chat = list(db['chat_messages'].find({}))
+        for cm in mongo_chat:
+            raw_id = cm.get('_id') or cm.get('id')
+            batch_id = cm.get('batch_id')
+            sender_id = cm.get('sender_id')
+            if batch_id and sender_id:
+                try:
+                    batch = Batch.objects.filter(id=batch_id).first()
+                    sender = User.objects.filter(id=sender_id).first()
+                    if batch and sender:
+                        chat_time = parse_datetime(cm.get('timestamp'))
+                        msg = None
+                        if str(raw_id).isdigit():
+                            msg = ChatMessage.objects.filter(id=int(raw_id)).first()
+                        if not msg:
+                            msg = ChatMessage(
+                                batch=batch,
+                                sender=sender,
+                                content=cm.get('content', '')
+                            )
+                            if str(raw_id).isdigit():
+                                msg.id = int(raw_id)
+                            msg.save()
+                            if chat_time:
+                                ChatMessage.objects.filter(id=msg.id).update(timestamp=chat_time)
+                except Exception:
+                    pass
+
+        # Update local sync tracking timestamp
+        _last_restore_time = last_write_time if last_write_time > 0 else time.time()
         print(f"[MongoDB Auto-Restore] Verified state ({len(mongo_users)} users, {len(mongo_batches)} batches, {len(mongo_notes)} study notes, {len(mongo_companies)} placement companies).")
     except Exception as err:
         print(f"[MongoDB Auto-Restore Error] {err}")

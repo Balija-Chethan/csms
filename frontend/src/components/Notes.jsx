@@ -9,7 +9,7 @@ export default function Notes({ API_URL, token }) {
   const fetchNotes = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/student/notes/`, {
+      const res = await fetch(`${API_URL}/student/notes/?_cb=${Date.now()}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
