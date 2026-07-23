@@ -327,12 +327,6 @@ def login_student(request):
 
     email = raw_email.strip().lower()
 
-    # Validate allowed domains for logging in
-    allowed_domains = getattr(settings, 'ALLOWED_EMAIL_DOMAINS', ['mits.ac.in'])
-    domain_match = any(email.endswith('@' + dom) or email.endswith('.' + dom) for dom in allowed_domains)
-    if not domain_match:
-        return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
-
     from api.mongo import restore_from_mongo
     restore_from_mongo()
 
@@ -346,6 +340,13 @@ def login_student(request):
 
     if not user or not user.check_password(password):
         return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    # Validate allowed domains for student logging in (admins bypass this check)
+    if user.role != 'admin':
+        allowed_domains = getattr(settings, 'ALLOWED_EMAIL_DOMAINS', ['mits.ac.in'])
+        domain_match = any(email.endswith('@' + dom) or email.endswith('.' + dom) for dom in allowed_domains)
+        if not domain_match:
+            return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
     token = generate_token(user)
     return Response({

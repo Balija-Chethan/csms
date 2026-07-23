@@ -1,7 +1,8 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { 
   LayoutDashboard, BookOpen, BarChart3, Users, 
-  Settings, LogOut, ChevronDown, ChevronRight, ClipboardList, Clock, ShieldAlert, Award, Menu
+  Settings, LogOut, ChevronDown, ChevronRight, ClipboardList, Clock, ShieldAlert, Award, Menu,
+  Key, FileText, User, Code2, Trophy, Calendar, GraduationCap
 } from 'lucide-react';
 
 const Login = lazy(() => import('./components/Login'));
@@ -293,7 +294,7 @@ export default function App() {
                   className={activeTab === 'admin_dashboard' ? "nav-btn-active" : "nav-btn"}
                   onClick={() => { setActiveTab('admin_dashboard'); setSidebarOpen(false); }}
                 >
-                  <LayoutDashboard size={18} />
+                  <LayoutDashboard size={20} />
                   Admin Workspace
                 </button>
 
@@ -301,7 +302,7 @@ export default function App() {
                   className={activeTab === 'admin_pending_requests' ? "nav-btn-active" : "nav-btn"}
                   onClick={() => { setActiveTab('admin_pending_requests'); setSidebarOpen(false); }}
                 >
-                  <Clock size={18} />
+                  <Clock size={20} />
                   Pending Requests
                 </button>
 
@@ -309,7 +310,7 @@ export default function App() {
                   className={activeTab === 'admin_allocation' ? "nav-btn-active" : "nav-btn"}
                   onClick={() => { setActiveTab('admin_allocation'); setSidebarOpen(false); }}
                 >
-                  <Users size={18} />
+                  <Users size={20} />
                   Batch Allocation
                 </button>
 
@@ -317,7 +318,7 @@ export default function App() {
                   className={activeTab === 'admin_users' ? "nav-btn-active" : "nav-btn"}
                   onClick={() => { setActiveTab('admin_users'); setSidebarOpen(false); }}
                 >
-                  <Users size={18} />
+                  <Users size={20} />
                   User Directory
                 </button>
 
@@ -325,7 +326,7 @@ export default function App() {
                   className={activeTab === 'admin_tasks' ? "nav-btn-active" : "nav-btn"}
                   onClick={() => { setActiveTab('admin_tasks'); setSidebarOpen(false); }}
                 >
-                  <ClipboardList size={18} />
+                  <ClipboardList size={20} />
                   Tasks & LeetCode
                 </button>
 
@@ -333,7 +334,7 @@ export default function App() {
                   className={activeTab === 'admin_grades' ? "nav-btn-active" : "nav-btn"}
                   onClick={() => { setActiveTab('admin_grades'); setSidebarOpen(false); }}
                 >
-                  <Award size={18} />
+                  <Award size={20} />
                   Grade Submissions
                 </button>
 
@@ -341,7 +342,7 @@ export default function App() {
                   className={activeTab === 'admin_mock_results' ? "nav-btn-active" : "nav-btn"}
                   onClick={() => { setActiveTab('admin_mock_results'); setSidebarOpen(false); }}
                 >
-                  <Award size={18} />
+                  <Award size={20} />
                   Placement Scores
                 </button>
 
@@ -349,7 +350,7 @@ export default function App() {
                   className={activeTab === 'admin_notes' ? "nav-btn-active" : "nav-btn"}
                   onClick={() => { setActiveTab('admin_notes'); setSidebarOpen(false); }}
                 >
-                  <BookOpen size={18} />
+                  <BookOpen size={20} />
                   Notes Manager
                 </button>
 
@@ -357,7 +358,7 @@ export default function App() {
                   className={activeTab === 'admin_placement_prep' ? "nav-btn-active" : "nav-btn"}
                   onClick={() => { setActiveTab('admin_placement_prep'); setSidebarOpen(false); }}
                 >
-                  <BookOpen size={18} />
+                  <BookOpen size={20} />
                   Prep Manager
                 </button>
 
@@ -365,7 +366,7 @@ export default function App() {
                   className={activeTab === 'admin_leaves' ? "nav-btn-active" : "nav-btn"}
                   onClick={() => { setActiveTab('admin_leaves'); setSidebarOpen(false); }}
                 >
-                  <ShieldAlert size={18} />
+                  <ShieldAlert size={20} />
                   Audit Leaves
                 </button>
 
@@ -373,7 +374,7 @@ export default function App() {
                   className={activeTab === 'admin_attendance' ? "nav-btn-active" : "nav-btn"}
                   onClick={() => { setActiveTab('admin_attendance'); setSidebarOpen(false); }}
                 >
-                  <Clock size={18} />
+                  <Clock size={20} />
                   Attendance Audit
                 </button>
 
@@ -381,23 +382,23 @@ export default function App() {
                 <div>
                   <button style={styles.submenuHeader} onClick={() => setAccountOpen(!accountOpen)}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Settings size={18} />
+                      <Settings size={20} />
                       <span>Account</span>
                     </div>
-                    {accountOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                    {accountOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                   </button>
 
-                  {accountOpen && (
-                    <div style={styles.submenuItems}>
+                  <div className={`submenu-wrapper ${accountOpen ? 'open' : ''}`}>
+                    <div className="submenu-wrapper-inner" style={styles.submenuItems}>
                       <button 
                         className={activeTab === 'admin_change_password' ? "nav-btn-active" : "nav-btn"}
-                        style={{ paddingLeft: 24 }}
                         onClick={() => { setActiveTab('admin_change_password'); setSidebarOpen(false); }}
                       >
-                        🔐 Change Password
+                        <Key size={20} />
+                        Change Password
                       </button>
                     </div>
-                  )}
+                  </div>
                 </div>
               </>
             ) : (
@@ -407,7 +408,7 @@ export default function App() {
                   className={activeTab === 'dashboard' ? "nav-btn-active" : "nav-btn"}
                   onClick={() => { setActiveTab('dashboard'); setSidebarOpen(false); }}
                 >
-                  <LayoutDashboard size={18} />
+                  <LayoutDashboard size={20} />
                   Dashboard
                 </button>
 
@@ -417,81 +418,81 @@ export default function App() {
                     <div>
                       <button style={styles.submenuHeader} onClick={() => setLearningOpen(!learningOpen)}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <BookOpen size={18} />
+                          <BookOpen size={20} />
                           <span>Learning</span>
                         </div>
-                        {learningOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                        {learningOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                       </button>
                       
-                      {learningOpen && (
-                        <div style={styles.submenuItems}>
+                      <div className={`submenu-wrapper ${learningOpen ? 'open' : ''}`}>
+                        <div className="submenu-wrapper-inner" style={styles.submenuItems}>
                           <button 
                             className={activeTab === 'tasks' ? "nav-btn-active" : "nav-btn"}
-                            style={{ paddingLeft: 24 }}
                             onClick={() => { setActiveTab('tasks'); setSidebarOpen(false); }}
                           >
+                            <ClipboardList size={20} />
                             My Tasks
                           </button>
                           <button 
                             className={activeTab === 'leetcode' ? "nav-btn-active" : "nav-btn"}
-                            style={{ paddingLeft: 24 }}
                             onClick={() => { setActiveTab('leetcode'); setSidebarOpen(false); }}
                           >
+                            <Code2 size={20} />
                             LeetCode Challenges
                           </button>
                           <button 
                             className={activeTab === 'notes' ? "nav-btn-active" : "nav-btn"}
-                            style={{ paddingLeft: 24 }}
                             onClick={() => { setActiveTab('notes'); setSidebarOpen(false); }}
                           >
+                            <BookOpen size={20} />
                             Study Notes
                           </button>
                           <button 
                             className={activeTab === 'placement_prep' ? "nav-btn-active" : "nav-btn"}
-                            style={{ paddingLeft: 24 }}
                             onClick={() => { setActiveTab('placement_prep'); setSidebarOpen(false); }}
                           >
+                            <GraduationCap size={20} />
                             Placement Prep
                           </button>
                         </div>
-                      )}
+                      </div>
                     </div>
 
                     {/* Performance Submenu */}
                     <div>
                       <button style={styles.submenuHeader} onClick={() => setPerformanceOpen(!performanceOpen)}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <BarChart3 size={18} />
+                          <BarChart3 size={20} />
                           <span>Performance</span>
                         </div>
-                        {performanceOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                        {performanceOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                       </button>
 
-                      {performanceOpen && (
-                        <div style={styles.submenuItems}>
+                      <div className={`submenu-wrapper ${performanceOpen ? 'open' : ''}`}>
+                        <div className="submenu-wrapper-inner" style={styles.submenuItems}>
                           <button 
                             className={activeTab === 'grades' ? "nav-btn-active" : "nav-btn"}
-                            style={{ paddingLeft: 24 }}
                             onClick={() => { setActiveTab('grades'); setSidebarOpen(false); }}
                           >
+                            <Award size={20} />
                             My Grades & Mocks
                           </button>
                           <button 
                             className={activeTab === 'leaderboard' ? "nav-btn-active" : "nav-btn"}
-                            style={{ paddingLeft: 24 }}
                             onClick={() => { setActiveTab('leaderboard'); setSidebarOpen(false); }}
                           >
+                            <Trophy size={20} />
                             Leaderboard
                           </button>
                           <button 
                             className={activeTab === 'attendance' ? "nav-btn-active" : "nav-btn"}
-                            style={{ paddingLeft: 24 }}
                             onClick={() => { setActiveTab('attendance'); setSidebarOpen(false); }}
                           >
+                            <Calendar size={20} />
                             Attendance Tracker
                           </button>
                         </div>
-                      )}
+                      </div>
                     </div>
 
                     {/* Chat */}
@@ -499,7 +500,7 @@ export default function App() {
                       className={activeTab === 'chat' ? "nav-btn-active" : "nav-btn"}
                       onClick={() => { setActiveTab('chat'); setSidebarOpen(false); }}
                     >
-                      <Users size={18} />
+                      <Users size={20} />
                       Batch Group Chat
                     </button>
                   </>
@@ -509,39 +510,39 @@ export default function App() {
                 <div>
                   <button style={styles.submenuHeader} onClick={() => setAccountOpen(!accountOpen)}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Settings size={18} />
+                      <Settings size={20} />
                       <span>Account</span>
                     </div>
-                    {accountOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                    {accountOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                   </button>
 
-                  {accountOpen && (
-                    <div style={styles.submenuItems}>
+                  <div className={`submenu-wrapper ${accountOpen ? 'open' : ''}`}>
+                    <div className="submenu-wrapper-inner" style={styles.submenuItems}>
                       {dashboardData?.status === 'allocated' && (
                         <button 
                           className={activeTab === 'leaves' ? "nav-btn-active" : "nav-btn"}
-                          style={{ paddingLeft: 24 }}
                           onClick={() => { setActiveTab('leaves'); setSidebarOpen(false); }}
                         >
+                          <FileText size={20} />
                           Leave Application
                         </button>
                       )}
                       <button 
                         className={activeTab === 'profile' ? "nav-btn-active" : "nav-btn"}
-                        style={{ paddingLeft: 24 }}
                         onClick={() => { setActiveTab('profile'); setSidebarOpen(false); }}
                       >
+                        <User size={20} />
                         My Profile
                       </button>
                     </div>
-                  )}
+                  </div>
                 </div>
               </>
             )}
           </nav>
 
           <button style={styles.logoutBtn} onClick={handleLogout}>
-            <LogOut size={18} />
+            <LogOut size={20} />
             Logout
           </button>
         </aside>
@@ -733,14 +734,16 @@ const styles = {
     justifyContent: 'space-between',
     background: 'none',
     border: 'none',
-    color: '#9ca3af',
+    color: 'var(--text-muted)',
     width: '100%',
-    padding: '12px 16px',
-    borderRadius: 8,
+    padding: '20px 16px 8px 16px',
     cursor: 'pointer',
-    fontFamily: 'var(--font-header)',
+    fontFamily: 'var(--font-primary)',
     fontWeight: 600,
-    fontSize: 14,
+    fontSize: '12px',
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+    outline: 'none',
   },
   submenuItems: {
     display: 'flex',
