@@ -331,6 +331,8 @@ def login_student(request):
     restore_from_mongo()
 
     user = User.objects.filter(email__iexact=email).first()
+    if not user:
+        user = User.objects.filter(username__iexact=email).first()
 
     if not user or not user.check_password(password):
         # Fallback authenticate check
