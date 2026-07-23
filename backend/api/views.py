@@ -1810,4 +1810,52 @@ def admin_reject_batch_request(request, enrollment_id):
     }, status=status.HTTP_200_OK)
 
 
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_change_password(request):
+    """Admin endpoint: Change the logged-in admin's password."""
+    if request.user.role != 'admin':
+        return Response({'error': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
+
+    current_password = request.data.get('currentPassword')
+    new_password = request.data.get('newPassword')
+    confirm_password = request.data.get('confirmPassword')
+
+    if not current_password or not new_password or not confirm_password:
+        return Response({'error': 'All fields are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Validate current password
+    if not request.user.check_password(current_password):
+        return Response({'error': 'Incorrect current password.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Validate mismatch
+    if new_password != confirm_password:
+        return Response({'error': 'New passwords do not match.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Validate new password is not same as current
+    if current_password == new_password:
+        return Response({'error': 'New password cannot be the same as the current password.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Password complexity requirements
+    import re
+    if len(new_password) < 8:
+        return Response({'error': 'Password must be at least 8 characters long.'}, status=status.HTTP_400_BAD_REQUEST)
+    if not re.search(r'[A-Z]', new_password):
+        return Response({'error': 'Password must contain at least one uppercase letter.'}, status=status.HTTP_400_BAD_REQUEST)
+    if not re.search(r'[a-z]', new_password):
+        return Response({'error': 'Password must contain at least one lowercase letter.'}, status=status.HTTP_400_BAD_REQUEST)
+    if not re.search(r'[0-9]', new_password):
+        return Response({'error': 'Password must contain at least one number.'}, status=status.HTTP_400_BAD_REQUEST)
+    if not re.search(r'[^a-zA-Z0-9]', new_password):
+        return Response({'error': 'Password must contain at least one special character.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Update password securely
+    request.user.set_password(new_password)
+    request.user.save()
+
+    return Response({'message': 'Password changed successfully.'}, status=status.HTTP_200_OK)
+
+
+
 

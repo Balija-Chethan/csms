@@ -242,3 +242,85 @@ class CSMSTests(TestCase):
         self.assertEqual(sub.quality_score, 90.0)
         self.assertEqual(sub.grade, "45/50")
         self.assertEqual(sub.feedback, "Great presentation override")
+
+    def test_admin_change_password_success(self):
+        """Admin should be able to change password with correct inputs."""
+        # Force authenticate as admin
+        admin_token = generate_token(self.admin)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {admin_token}')
+        
+        response = self.client.post('/admin/change-password/', {
+            'currentPassword': 'AdminPassword',
+            'newPassword': 'SecureNewPassword@123',
+            'confirmPassword': 'SecureNewPassword@123'
+        }, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['message'], 'Password changed successfully.')
+        
+        # Verify db updated
+        self.admin.refresh_from_db()
+        self.assertTrue(self.admin.check_password('SecureNewPassword@123'))
+
+    def test_admin_change_password_validation_failures(self):
+        """Verify password validation logic for incorrect inputs, reuse, mismatch, and weak passwords."""
+        admin_token = generate_token(self.admin)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {admin_token}')
+
+        # 1. Incorrect current password
+        response = self.client.post('/admin/change-password/', {
+            'currentPassword': 'WrongCurrentPassword',
+            'newPassword': 'SecureNewPassword@123',
+            'confirmPassword': 'SecureNewPassword@123'
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.json()['error'], 'Incorrect current password.')
+
+        # 2. Reuse current password
+        response = self.client.post('/admin/change-password/', {
+            'currentPassword': 'AdminPassword',
+            'newPassword': 'AdminPassword',
+            'confirmPassword': 'AdminPassword'
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.json()['error'], 'New password cannot be the same as the current password.')
+
+        # 3. New and confirm password mismatch
+        response = self.client.post('/admin/change-password/', {
+            'currentPassword': 'AdminPassword',
+            'newPassword': 'SecureNewPassword@123',
+            'confirmPassword': 'MismatchPassword@123'
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.json()['error'], 'New passwords do not match.')
+
+        # 4. Weak password complexity checks
+        weak_passwords = [
+            'Short1!',        # Less than 8 chars
+            'nocapital123!',   # No uppercase
+            'NO_LOWER_CASE_1', # No lowercase
+            'NoSpecial123',    # No special char
+            'NoNumbers!!!!'    # No number
+        ]
+        for wp in weak_passwords:
+            response = self.client.post('/admin/change-password/', {
+                'currentPassword': 'AdminPassword',
+                'newPassword': wp,
+                'confirmPassword': wp
+            }, format='json')
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_student_change_password_denied(self):
+        """Student role must be forbidden from accessing admin password change."""
+        student_token = generate_token(self.student)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {student_token}')
+
+        response = self.client.post('/admin/change-password/', {
+            'currentPassword': 'Password123',
+            'newPassword': 'SecureNewPassword@123',
+            'confirmPassword': 'SecureNewPassword@123'
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.json()['error'], 'Admin access required.')
+

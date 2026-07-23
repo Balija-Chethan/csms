@@ -75,7 +75,10 @@ export default function Login({ setAuth, API_URL }) {
       {/* Left Portion: Branding Header and Bottom Caption Info */}
       <div style={styles.leftPanel}>
         <div style={styles.topBranding}>
-          <div style={styles.logoTag}>CSMS Platform</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+            <img src="/logo.jpg" alt="CSMS Logo" style={{ height: 48, width: 'auto', borderRadius: 8, objectFit: 'contain' }} />
+            <div style={styles.logoTag}>CSMS Platform</div>
+          </div>
           <h1 style={styles.brandTitle}>Cheta Students Management System</h1>
         </div>
         <div style={styles.bottomBranding}>
@@ -96,6 +99,9 @@ export default function Login({ setAuth, API_URL }) {
       {/* Right Portion: Centered Login details on a semi-transparent panel */}
       <div style={styles.rightPanel}>
         <div style={styles.formCard}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
+            <img src="/logo.jpg" alt="CSMS Logo" style={{ height: 60, width: 'auto', borderRadius: 10, objectFit: 'contain' }} />
+          </div>
 
           <div style={{ marginBottom: 28 }}>
             <h2 style={styles.formHeader}>{isRegister ? 'Create an Account' : 'Welcome back'}</h2>

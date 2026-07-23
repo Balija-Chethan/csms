@@ -28,6 +28,7 @@ const AdminNotes = lazy(() => import('./components/AdminNotes'));
 const AdminMockResults = lazy(() => import('./components/AdminMockResults'));
 const AdminPlacementPrep = lazy(() => import('./components/AdminPlacementPrep'));
 const AdminUsers = lazy(() => import('./components/AdminUsers'));
+const AdminChangePassword = lazy(() => import('./components/AdminChangePassword'));
 
 // Student Onboarding components
 const BatchSelection = lazy(() => import('./components/BatchSelection'));
@@ -172,16 +173,18 @@ export default function App() {
 
   if (loading && !dashboardData) {
     return (
-      <div style={{ display: 'flex', height: '100vh', width: '100vw', alignItems: 'center', justifyContent: 'center', background: '#0b0f19', color: '#fff' }}>
-        <h2>Loading CSMS Portal...</h2>
+      <div style={{ display: 'flex', height: '100vh', width: '100vw', alignItems: 'center', justifyContent: 'center', background: '#0b0f19', color: '#fff', flexDirection: 'column', gap: 20 }}>
+        <img src="/logo.jpg" alt="CSMS Logo" style={{ height: 80, width: 'auto', borderRadius: 12, objectFit: 'contain' }} />
+        <h2 style={{ fontSize: 20, fontFamily: 'var(--font-header)' }}>Loading CSMS Portal...</h2>
       </div>
     );
   }
 
   if (user.role !== 'admin' && enrollmentStatus === null) {
     return (
-      <div style={{ display: 'flex', height: '100vh', width: '100vw', alignItems: 'center', justifyContent: 'center', background: '#0b0f19', color: '#fff' }}>
-        <h2>Loading CSMS Portal...</h2>
+      <div style={{ display: 'flex', height: '100vh', width: '100vw', alignItems: 'center', justifyContent: 'center', background: '#0b0f19', color: '#fff', flexDirection: 'column', gap: 20 }}>
+        <img src="/logo.jpg" alt="CSMS Logo" style={{ height: 80, width: 'auto', borderRadius: 12, objectFit: 'contain' }} />
+        <h2 style={{ fontSize: 20, fontFamily: 'var(--font-header)' }}>Loading CSMS Portal...</h2>
       </div>
     );
   }
@@ -210,7 +213,10 @@ export default function App() {
       {/* Top Header */}
       <header style={styles.header}>
         <div style={styles.headerLeft}>
-          <div style={styles.logo}>CSMS <span style={styles.logoVersion}>3.0</span></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <img src="/logo.jpg" alt="CSMS Logo" style={{ height: 40, width: 'auto', borderRadius: 6, objectFit: 'contain' }} />
+            <div style={styles.logo}>CSMS <span style={styles.logoVersion}>3.0</span></div>
+          </div>
         </div>
 
         <div style={styles.headerRight}>
@@ -254,6 +260,10 @@ export default function App() {
       <div style={styles.bodyLayout}>
         {/* Sidebar Panel */}
         <aside style={styles.sidebar}>
+          <div style={styles.sidebarBrand}>
+            <img src="/logo.jpg" alt="CSMS Logo" style={styles.sidebarLogo} />
+            <span style={styles.sidebarBrandText}>CSMS</span>
+          </div>
           <nav style={styles.nav}>
             {isAdmin ? (
               // ADMIN SIDEBAR NAVIGATION
@@ -345,6 +355,28 @@ export default function App() {
                   <Clock size={18} />
                   Attendance Logs Audit
                 </button>
+
+                {/* Admin Account Settings */}
+                <div>
+                  <button style={styles.submenuHeader} onClick={() => setAccountOpen(!accountOpen)}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Settings size={18} />
+                      <span>Account</span>
+                    </div>
+                    {accountOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                  </button>
+
+                  {accountOpen && (
+                    <div style={styles.submenuItems}>
+                      <button 
+                        style={activeTab === 'admin_change_password' ? styles.subItemActive : styles.subItem}
+                        onClick={() => setActiveTab('admin_change_password')}
+                      >
+                        🔐 Change Password
+                      </button>
+                    </div>
+                  )}
+                </div>
               </>
             ) : (
               // STUDENT SIDEBAR NAVIGATION
@@ -506,6 +538,7 @@ export default function App() {
                   {activeTab === 'admin_placement_prep' && <AdminPlacementPrep API_URL={API_URL} token={token} />}
                   {activeTab === 'admin_leaves' && <AdminLeaves API_URL={API_URL} token={token} />}
                   {activeTab === 'admin_attendance' && <AdminAttendance API_URL={API_URL} token={token} />}
+                  {activeTab === 'admin_change_password' && <AdminChangePassword API_URL={API_URL} token={token} handleLogout={handleLogout} />}
                 </>
 
               ) : (
@@ -657,6 +690,27 @@ const styles = {
     '@media (max-width: 768px)': {
       display: 'none',
     }
+  },
+  sidebarBrand: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    padding: '0 8px 16px 8px',
+    borderBottom: '1px solid var(--border-color)',
+    marginBottom: 16,
+  },
+  sidebarLogo: {
+    height: 36,
+    width: 'auto',
+    borderRadius: 6,
+    objectFit: 'contain',
+  },
+  sidebarBrandText: {
+    fontFamily: 'var(--font-header)',
+    fontSize: 18,
+    fontWeight: 800,
+    color: '#ffffff',
+    letterSpacing: '0.05em',
   },
   nav: {
     display: 'flex',

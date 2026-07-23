@@ -57,6 +57,7 @@ urlpatterns = [
     path('admin/pending-requests/', views.admin_pending_batch_requests, name='admin_pending_requests'),
     path('admin/approve/<int:enrollment_id>/', views.admin_approve_batch_request, name='admin_approve_request'),
     path('admin/reject/<int:enrollment_id>/', views.admin_reject_batch_request, name='admin_reject_request'),
+    path('admin/change-password/', views.admin_change_password, name='admin_change_password'),
 ]
 
 
