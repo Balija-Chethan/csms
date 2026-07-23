@@ -100,6 +100,10 @@ def restore_from_mongo(force=False):
     """Restore all data from MongoDB Atlas into active Django ORM models on startup/login."""
     global _last_restore_time
 
+    import sys
+    if 'test' in sys.argv:
+        return
+
     db = get_mongo_db()
     if db is None:
         return
@@ -165,57 +169,64 @@ def restore_from_mongo(force=False):
         # 1. Restore Users
         mongo_users = list(db['users'].find({}))
         for u in mongo_users:
-            raw_id = u.get('_id') or u.get('id')
-            email = u.get('email') or u.get('username')
-            username = u.get('username') or email
-            if not username:
-                continue
-            
-            existing = User.objects.filter(username=username).first() or User.objects.filter(email=email).first()
-            if not existing:
-                user = User(
-                    username=username,
-                    email=email,
-                    first_name=u.get('first_name', ''),
-                    last_name=u.get('last_name', ''),
-                    roll_number=u.get('roll_number', ''),
-                    phone_number=u.get('phone_number', ''),
-                    role=u.get('role', 'student'),
-                    github_url=u.get('github_url', ''),
-                    linkedin_url=u.get('linkedin_url', ''),
-                    portfolio_url=u.get('portfolio_url', ''),
-                    hackerrank_url=u.get('hackerrank_url', '')
-                )
-                if str(raw_id).isdigit():
-                    user.id = int(raw_id)
-                if u.get('password'):
-                    user.password = u['password']
+            try:
+                raw_id = u.get('_id') or u.get('id')
+                email = u.get('email') or u.get('username')
+                username = u.get('username') or email
+                if not username:
+                    continue
+                
+                existing = User.objects.filter(username=username).first() or User.objects.filter(email=email).first()
+                if not existing:
+                    user = User(
+                        username=username,
+                        email=email,
+                        first_name=u.get('first_name', ''),
+                        last_name=u.get('last_name', ''),
+                        roll_number=u.get('roll_number', ''),
+                        phone_number=u.get('phone_number', ''),
+                        role=u.get('role', 'student'),
+                        github_url=u.get('github_url', ''),
+                        linkedin_url=u.get('linkedin_url', ''),
+                        portfolio_url=u.get('portfolio_url', ''),
+                        hackerrank_url=u.get('hackerrank_url', '')
+                    )
+                    if str(raw_id).isdigit():
+                        user.id = int(raw_id)
+                    if u.get('password'):
+                        user.password = u['password']
+                    else:
+                        user.set_password('password123')
+                    user.save()
                 else:
-                    user.set_password('password123')
-                user.save()
-            else:
-                if u.get('password') and existing.password != u['password']:
-                    existing.password = u['password']
-                    existing.save(update_fields=['password'])
+                    if u.get('password') and existing.password != u['password']:
+                        existing.password = u['password']
+                        existing.save(update_fields=['password'])
+            except Exception as user_err:
+                print(f"[MongoDB Auto-Restore] Error restoring user {u.get('username')}: {user_err}")
 
         # 2. Restore Batches
         mongo_batches = list(db['batches'].find({}))
         for b in mongo_batches:
-            raw_id = b.get('_id') or b.get('id')
-            b_name = b.get('name')
-            if not b_name:
-                continue
-            existing = Batch.objects.filter(name=b_name).first()
-            if not existing:
-                batch = Batch(
-                    name=b_name,
-                    description=b.get('description', ''),
-                    trainer_name=b.get('trainer_name', 'Senior Instructor'),
-                    max_seats=b.get('max_seats', 60)
-                )
-                if str(raw_id).isdigit():
-                    batch.id = int(raw_id)
-                batch.save()
+            try:
+                raw_id = b.get('_id') or b.get('id')
+                b_name = b.get('name')
+                if not b_name:
+                    continue
+                existing = Batch.objects.filter(name=b_name).first()
+                if not existing:
+                    batch = Batch(
+                        name=b_name,
+                        description=b.get('description', ''),
+                        trainer_name=b.get('trainer_name', 'Senior Instructor'),
+                        max_seats=b.get('max_seats', 60),
+                        created_at=parse_datetime(b.get('created_at')) or timezone.now()
+                    )
+                    if str(raw_id).isdigit():
+                        batch.id = int(raw_id)
+                    batch.save()
+            except Exception as batch_err:
+                print(f"[MongoDB Auto-Restore] Error restoring batch {b.get('name')}: {batch_err}")
 
         # 3. Restore BatchEnrollments
         mongo_enrollments = list(db['batch_enrollments'].find({}))
