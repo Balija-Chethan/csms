@@ -33,21 +33,21 @@ export default function Leaderboard({ API_URL, token }) {
           <p style={styles.subheader}>Review academic rankings of students based on task grades and mock scores.</p>
         </div>
         <div style={styles.filterGroup}>
-          <select className="custom-input" style={{ width: 180, height: 44 }}>
+          <select className="custom-input" style={{ width: 180, height: 42 }}>
             <option>PYTHON-FSD</option>
           </select>
         </div>
       </div>
 
-      <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
-        <table style={styles.table}>
+      <div className="table-container" style={{ margin: 0 }}>
+        <table className="custom-table">
           <thead>
-            <tr style={styles.theadRow}>
-              <th style={styles.th}>Rank</th>
-              <th style={styles.th}>Student Name</th>
-              <th style={styles.th}>Tasks Score</th>
-              <th style={styles.th}>Mocks Score</th>
-              <th style={styles.th}>Overall Score</th>
+            <tr>
+              <th>Rank</th>
+              <th>Student Name</th>
+              <th>Tasks Score</th>
+              <th>Mocks Score</th>
+              <th>Overall Score</th>
             </tr>
           </thead>
           <tbody>
@@ -55,25 +55,24 @@ export default function Leaderboard({ API_URL, token }) {
               <tr 
                 key={stud.id} 
                 style={{ 
-                  ...styles.tr, 
-                  backgroundColor: stud.is_me ? 'rgba(59,130,246,0.08)' : 'transparent',
-                  borderLeft: stud.is_me ? '4px solid #3b82f6' : '4px solid transparent'
+                  backgroundColor: stud.is_me ? 'rgba(59,130,246,0.06)' : 'transparent',
+                  borderLeft: stud.is_me ? '4px solid var(--primary)' : '4px solid transparent'
                 }}
               >
-                <td style={{ ...styles.td, fontWeight: 'bold' }}>
+                <td style={{ fontWeight: '800', color: stud.rank <= 3 ? '#ffffff' : 'var(--text-muted)' }}>
                   {stud.rank === 1 ? '🥇 1' : stud.rank === 2 ? '🥈 2' : stud.rank === 3 ? '🥉 3' : stud.rank}
                 </td>
-                <td style={styles.td}>
+                <td>
                   <div style={styles.studentCol}>
-                    <span style={{ fontWeight: 'bold', color: '#ffffff' }}>
+                    <span style={{ fontWeight: '700', color: stud.is_me ? '#ffffff' : 'var(--text-main)' }}>
                       {stud.name}
                     </span>
                     {stud.is_me && <span style={styles.meTag}>(You)</span>}
                   </div>
                 </td>
-                <td style={styles.td}>{stud.tasksScore}</td>
-                <td style={styles.td}>{stud.mocksScore.toFixed(0)}</td>
-                <td style={{ ...styles.td, fontWeight: 'bold', color: '#3b82f6' }}>{stud.overallScore.toFixed(0)}</td>
+                <td style={{ fontFamily: 'var(--font-mono)' }}>{stud.tasksScore}</td>
+                <td style={{ fontFamily: 'var(--font-mono)' }}>{stud.mocksScore.toFixed(0)}</td>
+                <td style={{ fontWeight: '800', color: 'var(--primary)', fontFamily: 'var(--font-mono)' }}>{stud.overallScore.toFixed(0)}</td>
               </tr>
             ))}
           </tbody>
@@ -87,7 +86,9 @@ const styles = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 24,
+    gap: 32,
+    position: 'relative',
+    zIndex: 2,
   },
   headerRow: {
     display: 'flex',
@@ -95,11 +96,13 @@ const styles = {
     alignItems: 'center',
     gap: 20,
     borderBottom: '1px solid rgba(255,255,255,0.06)',
-    paddingBottom: 20,
+    paddingBottom: 24,
   },
   header: {
     color: '#ffffff',
+    fontFamily: 'var(--font-header)',
     fontSize: 26,
+    fontWeight: 800,
     marginBottom: 6,
   },
   subheader: {
@@ -109,43 +112,18 @@ const styles = {
   filterGroup: {
     alignSelf: 'center',
   },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    textAlign: 'left',
-  },
-  theadRow: {
-    borderBottom: '1px solid rgba(255,255,255,0.08)',
-    background: 'rgba(255,255,255,0.02)',
-  },
-  th: {
-    padding: '16px 20px',
-    color: '#9ca3af',
-    fontWeight: 'bold',
-    fontSize: 13,
-    textTransform: 'uppercase',
-  },
-  tr: {
-    borderBottom: '1px solid rgba(255,255,255,0.05)',
-    transition: 'background 0.2s',
-  },
-  td: {
-    padding: '16px 20px',
-    fontSize: 14,
-    color: '#e5e7eb',
-    verticalAlign: 'middle',
-  },
   studentCol: {
     display: 'flex',
     alignItems: 'center',
     gap: 8,
   },
   meTag: {
-    background: 'rgba(59,130,246,0.15)',
-    color: '#3b82f6',
+    background: 'rgba(59, 130, 246, 0.1)',
+    color: 'var(--primary)',
     fontSize: 10,
-    fontWeight: 'bold',
-    padding: '2px 6px',
-    borderRadius: 4,
+    fontWeight: '700',
+    padding: '2px 8px',
+    borderRadius: 6,
+    border: '1px solid rgba(59, 130, 246, 0.2)',
   }
 };

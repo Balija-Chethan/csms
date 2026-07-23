@@ -107,7 +107,7 @@ export default function AdminNotes({ API_URL, token }) {
         Publish global or batch-specific study material, cheatsheets, and Google Drive guides for students.
       </p>
 
-      <div style={styles.layout}>
+      <div className="admin-users-layout" style={styles.layout}>
         {/* Create Form */}
         <div className="glass-card" style={styles.formCard}>
           <h3 style={styles.formHeader}>
@@ -228,35 +228,35 @@ const styles = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 24,
+    gap: 32,
+    position: 'relative',
+    zIndex: 2,
   },
   header: {
     display: 'flex',
     alignItems: 'center',
     gap: 12,
     color: '#ffffff',
-    fontSize: 24,
+    fontFamily: 'var(--font-header)',
+    fontSize: 26,
+    fontWeight: 800,
   },
   subheader: {
     fontSize: 14,
     color: '#9ca3af',
     borderBottom: '1px solid rgba(255,255,255,0.06)',
-    paddingBottom: 20,
+    paddingBottom: 24,
     marginTop: -8,
   },
-  layout: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1.5fr',
-    gap: 24,
-    '@media (max-width: 900px)': {
-      gridTemplateColumns: '1fr',
-    }
-  },
+  layout: {},
   formCard: {
     padding: 24,
+    borderRadius: '20px',
   },
   formHeader: {
     fontSize: 18,
+    fontFamily: 'var(--font-header)',
+    fontWeight: 700,
     color: '#ffffff',
     marginBottom: 20,
     display: 'flex',
@@ -275,8 +275,8 @@ const styles = {
   },
   label: {
     fontSize: 13,
-    color: '#d1d5db',
-    fontWeight: 'bold',
+    color: '#cbd5e1',
+    fontWeight: '500',
   },
   listSection: {
     display: 'flex',
@@ -288,20 +288,22 @@ const styles = {
     gap: 16,
   },
   card: {
-    padding: 20,
+    padding: 24,
     display: 'flex',
     flexDirection: 'column',
     gap: 12,
+    borderRadius: '20px',
   },
   cardTitle: {
     color: '#ffffff',
+    fontFamily: 'var(--font-header)',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   cardSummary: {
     color: '#9ca3af',
     fontSize: 13,
-    lineHeight: 1.4,
+    lineHeight: 1.5,
   },
   cardFooter: {
     display: 'flex',
@@ -312,12 +314,12 @@ const styles = {
     paddingTop: 12,
   },
   link: {
-    color: '#10b981',
+    color: '#60a5fa',
     fontSize: 12,
     textDecoration: 'none',
     display: 'inline-flex',
     alignItems: 'center',
     gap: 4,
-    fontWeight: 'bold',
+    fontWeight: '700',
   }
 };

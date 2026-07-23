@@ -4,7 +4,7 @@ from api.models import (
     User, Batch, BatchEnrollment, Task, Submission,
     LeetcodeChallenge, LeetcodeSubmission, StudyNote,
     MockDriveResult, AttendanceLog, LeaveRequest, ChatMessage,
-    PlacementCompany, PlacementRound, PlacementResource
+    PlacementCompany, PlacementRound, PlacementResource, PasswordResetOTP
 )
 from api.mongo import sync_to_mongo, delete_from_mongo
 
@@ -298,3 +298,23 @@ def sync_resource_to_mongo(sender, instance, **kwargs):
 @receiver(post_delete, sender=PlacementResource)
 def delete_resource_from_mongo(sender, instance, **kwargs):
     delete_from_mongo('placement_resources', instance.id)
+
+
+# 16. PasswordResetOTP
+@receiver(post_save, sender=PasswordResetOTP)
+def sync_otp_to_mongo(sender, instance, **kwargs):
+    data = {
+        'id': instance.id,
+        'email': instance.email,
+        'otp_hash': instance.otp_hash,
+        'created_at': str(instance.created_at) if instance.created_at else None,
+        'expires_at': str(instance.expires_at) if instance.expires_at else None,
+        'attempts': instance.attempts,
+        'is_verified': instance.is_verified,
+        'is_used': instance.is_used
+    }
+    sync_to_mongo('password_reset_otps', instance.id, data)
+
+@receiver(post_delete, sender=PasswordResetOTP)
+def delete_otp_from_mongo(sender, instance, **kwargs):
+    delete_from_mongo('password_reset_otps', instance.id)

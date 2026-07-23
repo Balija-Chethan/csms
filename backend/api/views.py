@@ -27,6 +27,18 @@ def get_student_batch(student):
     enrollment = BatchEnrollment.objects.filter(student=student, status='approved').first()
     return enrollment.batch if enrollment else None
 
+_leaderboard_cache = {}
+
+def get_cached_leaderboard_rankings(batch):
+    import time
+    now = time.time()
+    cached = _leaderboard_cache.get(batch.id)
+    if cached and (now - cached[0] < 30):
+        return cached[1]
+    rankings = get_leaderboard_rankings(batch)
+    _leaderboard_cache[batch.id] = (now, rankings)
+    return rankings
+
 def get_leaderboard_rankings(batch):
     from django.db.models import Count, Sum, Q
     from django.db.models.functions import Coalesce
@@ -206,27 +218,70 @@ def get_online_student_count():
     five_mins_ago = timezone.now() - timedelta(minutes=5)
     return User.objects.filter(role='student', last_seen__gte=five_mins_ago).count()
 
+import re
+import secrets
+import hashlib
+from django.conf import settings
+from django.core.mail import send_mail
+from api.models import PasswordResetOTP
+
+def is_strong_password(password):
+    if len(password) < 8:
+        return False, "Password must be at least 8 characters long."
+    if not re.search(r'[A-Z]', password):
+        return False, "Password must contain at least one uppercase letter."
+    if not re.search(r'[a-z]', password):
+        return False, "Password must contain at least one lowercase letter."
+    if not re.search(r'[0-9]', password):
+        return False, "Password must contain at least one number."
+    if not re.search(r'[^A-Za-z0-9]', password):
+        return False, "Password must contain at least one special character."
+    return True, ""
+
+def hash_otp(otp: str) -> str:
+    return hashlib.sha256(otp.encode('utf-8')).hexdigest()
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_student(request):
     data = request.data
     raw_email = data.get('email', '')
     password = data.get('password', '')
+    confirm_password = data.get('confirmPassword', '')
     first_name = data.get('firstName', '')
     last_name = data.get('lastName', '')
     roll_number = data.get('rollNumber', '')
     phone_number = data.get('phoneNumber', '')
 
-    if not raw_email or not password:
-        return Response({'error': 'Email and password are required'}, status=status.HTTP_400_BAD_REQUEST)
+    if not raw_email or not password or not confirm_password or not first_name or not last_name:
+        return Response({'error': 'First name, last name, email, password, and confirm password are required'}, status=status.HTTP_400_BAD_REQUEST)
 
     email = raw_email.strip().lower()
+
+    # Validate email format
+    if not re.match(r'[^@]+@[^@]+\.[^@]+', email):
+        return Response({'error': 'Invalid email format'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Validate domain
+    allowed_domains = getattr(settings, 'ALLOWED_EMAIL_DOMAINS', ['mits.ac.in'])
+    domain_match = any(email.endswith('@' + dom) or email.endswith('.' + dom) for dom in allowed_domains)
+    if not domain_match:
+        return Response({'error': f'Only email addresses from allowed domains ({", ".join(allowed_domains)}) are accepted'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Validate passwords match
+    if password != confirm_password:
+        return Response({'error': 'Passwords do not match'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Validate password complexity
+    strong, msg = is_strong_password(password)
+    if not strong:
+        return Response({'error': msg}, status=status.HTTP_400_BAD_REQUEST)
 
     # Restore from mongo first to check existing accounts
     from api.mongo import get_mongo_db, restore_from_mongo, sync_to_mongo
     restore_from_mongo()
 
-    if User.objects.filter(username__iexact=email).exists() or User.objects.filter(email__iexact=email).exists():
+    if User.objects.filter(email__iexact=email).exists() or User.objects.filter(username__iexact=email).exists():
         return Response({'error': 'A user with this email already exists'}, status=status.HTTP_400_BAD_REQUEST)
 
     user = User.objects.create_user(
@@ -272,12 +327,19 @@ def login_student(request):
 
     email = raw_email.strip().lower()
 
+    # Validate allowed domains for logging in
+    allowed_domains = getattr(settings, 'ALLOWED_EMAIL_DOMAINS', ['mits.ac.in'])
+    domain_match = any(email.endswith('@' + dom) or email.endswith('.' + dom) for dom in allowed_domains)
+    if not domain_match:
+        return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+
     from api.mongo import restore_from_mongo
     restore_from_mongo()
 
-    user = User.objects.filter(username__iexact=email).first() or User.objects.filter(email__iexact=email).first()
+    user = User.objects.filter(email__iexact=email).first()
 
     if not user or not user.check_password(password):
+        # Fallback authenticate check
         user_auth = authenticate(username=email, password=password)
         if user_auth:
             user = user_auth
@@ -290,6 +352,183 @@ def login_student(request):
         'token': token,
         'user': UserSerializer(user).data
     }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def forgot_password(request):
+    raw_email = request.data.get('email', '')
+    if not raw_email:
+        return Response({'error': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    email = raw_email.strip().lower()
+
+    # Validate email format
+    if not re.match(r'[^@]+@[^@]+\.[^@]+', email):
+        return Response({'error': 'Invalid email format'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Validate domain
+    allowed_domains = getattr(settings, 'ALLOWED_EMAIL_DOMAINS', ['mits.ac.in'])
+    domain_match = any(email.endswith('@' + dom) or email.endswith('.' + dom) for dom in allowed_domains)
+    if not domain_match:
+        return Response({'error': 'Only official emails from allowed domains are accepted'}, status=status.HTTP_400_BAD_REQUEST)
+
+    from api.mongo import restore_from_mongo
+    restore_from_mongo()
+
+    user = User.objects.filter(email__iexact=email).first()
+    if not user:
+        return Response({'error': 'No account exists with this email'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Enforce 60s rate limit
+    last_otp = PasswordResetOTP.objects.filter(email=email).order_by('-created_at').first()
+    if last_otp:
+        elapsed = (timezone.now() - last_otp.created_at).total_seconds()
+        if elapsed < 60:
+            return Response({'error': f'Please wait {int(60 - elapsed)} seconds before requesting a new OTP.'}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+
+    # Invalidate previous OTPs
+    PasswordResetOTP.objects.filter(email=email).delete()
+    from api.mongo import delete_from_mongo
+    delete_from_mongo('password_reset_otps', email) # delete from mongo mapping if matching by email key
+
+    # Generate 6-digit secure OTP using Python's choice from secrets
+    otp_digits = [secrets.choice('0123456789') for _ in range(6)]
+    otp = ''.join(otp_digits)
+
+    # Expiry is 5 minutes
+    expires_at = timezone.now() + timezone.timedelta(minutes=5)
+    otp_hash = hash_otp(otp)
+
+    otp_record = PasswordResetOTP.objects.create(
+        email=email,
+        otp_hash=otp_hash,
+        expires_at=expires_at
+    )
+
+    # Send Email
+    subject = "CSMS Password Reset OTP"
+    body = f"""Hello,
+
+You requested to reset your CSMS account password.
+
+Your One-Time Password (OTP) is:
+
+{otp}
+
+This OTP is valid for 5 minutes.
+
+Do not share this OTP with anyone.
+
+If you did not request this password reset, please ignore this email.
+
+Regards,
+CSMS Team"""
+
+    try:
+        send_mail(
+            subject=subject,
+            message=body,
+            from_email=settings.DEFAULT_FROM_EMAIL or 'noreply@mits.ac.in',
+            recipient_list=[email],
+            fail_silently=False,
+        )
+    except Exception as e:
+        print(f"[Email Send Error] Failed to send email via SMTP: {e}")
+        # In console backend, the OTP prints to standard output automatically. 
+
+    return Response({'status': 'OTP sent successfully. Please check your inbox.'}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def verify_otp(request):
+    raw_email = request.data.get('email', '')
+    otp = request.data.get('otp', '')
+
+    if not raw_email or not otp:
+        return Response({'error': 'Email and OTP are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    email = raw_email.strip().lower()
+    otp = otp.strip()
+
+    from api.mongo import restore_from_mongo
+    restore_from_mongo()
+
+    otp_record = PasswordResetOTP.objects.filter(email=email, is_verified=False, is_used=False).order_by('-created_at').first()
+    if not otp_record:
+        return Response({'error': 'No OTP request found for this email.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Check Expiry
+    if otp_record.is_expired():
+        return Response({'error': 'OTP has expired. Please request a new one.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Check Attempts
+    if otp_record.attempts >= 5:
+        return Response({'error': 'Maximum verification attempts exceeded. Please request a new OTP.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    otp_record.attempts += 1
+    otp_record.save()
+
+    # Verify Hash
+    if hash_otp(otp) != otp_record.otp_hash:
+        return Response({'error': f'Invalid OTP. Attempts remaining: {5 - otp_record.attempts}'}, status=status.HTTP_400_BAD_REQUEST)
+
+    otp_record.is_verified = True
+    otp_record.save()
+
+    return Response({'status': 'OTP verified successfully. Proceed to reset password.'}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def reset_password(request):
+    raw_email = request.data.get('email', '')
+    new_password = request.data.get('newPassword', '')
+    confirm_password = request.data.get('confirmPassword', '')
+
+    if not raw_email or not new_password or not confirm_password:
+        return Response({'error': 'Email, new password, and confirm password are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    email = raw_email.strip().lower()
+
+    # Validate OTP verification state
+    from api.mongo import restore_from_mongo
+    restore_from_mongo()
+
+    otp_record = PasswordResetOTP.objects.filter(email=email, is_verified=True, is_used=False).order_by('-created_at').first()
+    if not otp_record:
+        return Response({'error': 'Unauthorized password reset request.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Verify session is still valid (5 minutes from OTP creation)
+    if (timezone.now() - otp_record.created_at).total_seconds() > 300:
+        return Response({'error': 'Password reset session expired. Please verify OTP again.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    user = User.objects.filter(email__iexact=email).first()
+    if not user:
+        return Response({'error': 'User does not exist.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if new_password != confirm_password:
+        return Response({'error': 'Passwords do not match.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Complexity checks
+    strong, msg = is_strong_password(new_password)
+    if not strong:
+        return Response({'error': msg}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Must not match previous password
+    if user.check_password(new_password):
+        return Response({'error': 'New password must not be the same as your previous password.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Invalidate session and update password using Django's built-in PBKDF2 hash
+    user.set_password(new_password)
+    user.save()
+
+    # Mark OTP as used
+    otp_record.is_used = True
+    otp_record.save()
+
+    return Response({'status': 'Password changed successfully.'}, status=status.HTTP_200_OK)
 
 
 
@@ -362,7 +601,7 @@ def student_dashboard(request):
     completion_rate = round((completed_submissions / total_tasks) * 100) if total_tasks > 0 else 0
 
     # 2. Leaderboard Rank
-    rankings = get_leaderboard_rankings(batch)
+    rankings = get_cached_leaderboard_rankings(batch)
     my_rank = 1
     for idx, r in enumerate(rankings):
         if r['id'] == user.id:
@@ -392,7 +631,7 @@ def student_dashboard(request):
 
     # 5. Recent Activity Feed
     recent_activities = []
-    for sub in Submission.objects.filter(student=user).order_by('-submitted_at')[:5]:
+    for sub in Submission.objects.filter(student=user).select_related('task').order_by('-submitted_at')[:5]:
         if sub.grade:
             recent_activities.append({
                 'type': 'task_graded',
@@ -413,7 +652,7 @@ def student_dashboard(request):
     mock_drives = MockDriveResult.objects.filter(student=user).order_by('-date')
 
     # 6. Graded Tasks Performance Trend
-    submissions = Submission.objects.filter(student=user, grade__isnull=False).order_by('graded_at')
+    submissions = Submission.objects.filter(student=user, grade__isnull=False).select_related('task').order_by('graded_at')
     grade_trend = []
     for sub in submissions:
         pct = sub.quality_score if sub.quality_score is not None else parse_grade_to_percentage(sub.grade)
@@ -1512,7 +1751,19 @@ def admin_create_student(request):
     if not email:
         return Response({'error': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-    if User.objects.filter(username=email).exists():
+    email = email.strip().lower()
+
+    # Validate email format
+    if not re.match(r'[^@]+@[^@]+\.[^@]+', email):
+        return Response({'error': 'Invalid email format'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Validate domain
+    allowed_domains = getattr(settings, 'ALLOWED_EMAIL_DOMAINS', ['mits.ac.in'])
+    domain_match = any(email.endswith('@' + dom) or email.endswith('.' + dom) for dom in allowed_domains)
+    if not domain_match:
+        return Response({'error': f'Only email addresses from allowed domains ({", ".join(allowed_domains)}) are accepted'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if User.objects.filter(email__iexact=email).exists() or User.objects.filter(username__iexact=email).exists():
         return Response({'error': 'User with this email already exists'}, status=status.HTTP_400_BAD_REQUEST)
 
     user = User.objects.create_user(

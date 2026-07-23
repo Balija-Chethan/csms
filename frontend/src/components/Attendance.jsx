@@ -108,33 +108,33 @@ export default function Attendance({ API_URL, token }) {
       </div>
 
       {viewStyle === 'daily' ? (
-        <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
-          <table style={styles.table}>
+        <div className="table-container" style={{ margin: 0 }}>
+          <table className="custom-table">
             <thead>
-              <tr style={styles.theadRow}>
-                <th style={styles.th}>Date</th>
-                <th style={styles.th}>First Check-In</th>
-                <th style={styles.th}>Last Check-Out</th>
-                <th style={styles.th}>Total Logged Time</th>
-                <th style={styles.th}>Daily Status</th>
+              <tr>
+                <th>Date</th>
+                <th>First Check-In</th>
+                <th>Last Check-Out</th>
+                <th>Total Logged Time</th>
+                <th>Daily Status</th>
               </tr>
             </thead>
             <tbody>
               {logs.map((log, index) => (
-                <tr key={index} style={styles.tr}>
-                  <td style={{ ...styles.td, fontWeight: 'bold' }}>{log.date}</td>
-                  <td style={styles.td}>
+                <tr key={index}>
+                  <td style={{ fontWeight: '700', color: '#ffffff' }}>{log.date}</td>
+                  <td style={{ fontFamily: 'var(--font-mono)' }}>
                     {log.check_in ? new Date(log.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'N/A'}
                   </td>
-                  <td style={styles.td}>
+                  <td style={{ fontFamily: 'var(--font-mono)' }}>
                     {log.check_out ? new Date(log.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'N/A'}
                   </td>
-                  <td style={styles.td}>{formatDuration(log.total_time)}</td>
-                  <td style={styles.td}>
+                  <td style={{ fontFamily: 'var(--font-mono)' }}>{formatDuration(log.total_time)}</td>
+                  <td>
                     {log.status === 'present' ? (
                       <span className="badge badge-success">Present</span>
                     ) : log.status === 'leave' ? (
-                      <span className="badge badge-warning" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>Leave</span>
+                      <span className="badge badge-info">Leave</span>
                     ) : (
                       <span className="badge badge-danger">Absent</span>
                     )}
@@ -158,7 +158,7 @@ export default function Attendance({ API_URL, token }) {
                 className="glass-card" 
                 style={{ 
                   ...styles.calCard, 
-                  border: log.status === 'present' ? '1px solid #10b981' : log.status === 'leave' ? '1px solid #3b82f6' : '1px solid #ef4444',
+                  border: log.status === 'present' ? '1px solid var(--success)' : log.status === 'leave' ? '1px solid var(--primary)' : '1px solid var(--danger)',
                   background: log.status === 'present' ? 'rgba(16,185,129,0.04)' : log.status === 'leave' ? 'rgba(59,130,246,0.04)' : 'rgba(239,68,68,0.04)'
                 }}
               >
@@ -190,7 +190,9 @@ const styles = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 24,
+    gap: 32,
+    position: 'relative',
+    zIndex: 2,
   },
   headerRow: {
     display: 'flex',
@@ -198,11 +200,13 @@ const styles = {
     alignItems: 'center',
     gap: 20,
     borderBottom: '1px solid rgba(255,255,255,0.06)',
-    paddingBottom: 20,
+    paddingBottom: 24,
   },
   header: {
     color: '#ffffff',
+    fontFamily: 'var(--font-header)',
     fontSize: 26,
+    fontWeight: 800,
     marginBottom: 6,
   },
   subheader: {
@@ -216,57 +220,35 @@ const styles = {
   },
   statsRow: {
     display: 'flex',
-    gap: 20,
+    gap: 24,
     flexWrap: 'wrap',
   },
   statCard: {
     flex: 1,
     minWidth: 200,
     textAlign: 'center',
-    padding: 20,
+    padding: 24,
+    borderRadius: '18px',
   },
   statVal: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: '800',
     color: '#ffffff',
     marginBottom: 4,
+    fontFamily: 'var(--font-header)',
   },
   statLabel: {
     fontSize: 13,
     color: '#9ca3af',
   },
   infoBanner: {
-    background: 'rgba(59,130,246,0.1)',
-    border: '1px solid rgba(59,130,246,0.2)',
-    borderRadius: 8,
-    padding: '12px 16px',
+    background: 'rgba(59, 130, 246, 0.08)',
+    border: '1px solid rgba(59, 130, 246, 0.25)',
+    borderRadius: 12,
+    padding: '16px 20px',
     fontSize: 14,
     color: '#93c5fd',
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    textAlign: 'left',
-  },
-  theadRow: {
-    borderBottom: '1px solid rgba(255,255,255,0.08)',
-    background: 'rgba(255,255,255,0.02)',
-  },
-  th: {
-    padding: '16px 20px',
-    color: '#9ca3af',
-    fontWeight: 'bold',
-    fontSize: 13,
-    textTransform: 'uppercase',
-  },
-  tr: {
-    borderBottom: '1px solid rgba(255,255,255,0.05)',
-    transition: 'background 0.2s',
-  },
-  td: {
-    padding: '16px 20px',
-    fontSize: 14,
-    color: '#e5e7eb',
+    lineHeight: 1.6,
   },
   calendarGrid: {
     display: 'grid',
@@ -278,8 +260,9 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '16px 12px',
+    padding: '20px 14px',
     textAlign: 'center',
+    borderRadius: '16px',
   },
   calDayName: {
     fontSize: 11,
@@ -292,7 +275,7 @@ const styles = {
     fontFamily: 'var(--font-header)',
     fontWeight: 800,
     color: '#ffffff',
-    margin: '4px 0',
+    margin: '6px 0',
   },
   calMonth: {
     fontSize: 11,

@@ -92,7 +92,7 @@ export default function AdminMockResults({ API_URL, token }) {
         Assign and publish student scores for mock placement drives (Aptitude, Technical, Coding & HR rounds).
       </p>
 
-      <div style={styles.layout}>
+      <div className="admin-users-layout" style={styles.layout}>
         {/* Create Score Form */}
         <div className="glass-card" style={styles.formCard}>
           <h3 style={styles.formHeader}>
@@ -173,38 +173,36 @@ export default function AdminMockResults({ API_URL, token }) {
         </div>
 
         {/* Existing Scores Table */}
-        <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="table-container" style={{ margin: 0 }}>
           <div style={{ padding: 20, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <h3 style={{ color: '#fff' }}>Student Mock Drive Records ({results.length})</h3>
+            <h3 style={{ color: '#fff', fontSize: 16, fontFamily: 'var(--font-header)', fontWeight: 700 }}>Student Mock Drive Records ({results.length})</h3>
           </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={styles.table}>
-              <thead>
-                <tr style={styles.theadRow}>
-                  <th style={styles.th}>Date</th>
-                  <th style={styles.th}>Student Name</th>
-                  <th style={styles.th}>Test Name</th>
-                  <th style={styles.th}>Total Score</th>
-                  <th style={styles.th}>Grade</th>
+          <table className="custom-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Student Name</th>
+                <th>Test Name</th>
+                <th>Total Score</th>
+                <th>Grade</th>
+              </tr>
+            </thead>
+            <tbody>
+              {results.map(r => (
+                <tr key={r.id}>
+                  <td style={{ fontWeight: '700', color: '#ffffff' }}>{r.date}</td>
+                  <td>{r.student_name} ({r.student_roll})</td>
+                  <td>{r.test_name}</td>
+                  <td style={{ fontFamily: 'var(--font-mono)' }}>{r.total_score} pts</td>
+                  <td>
+                    <span className={`badge ${r.grade === 'S' || r.grade === 'A' ? 'badge-success' : r.grade === 'B' ? 'badge-warning' : 'badge-danger'}`}>
+                      Grade {r.grade}
+                    </span>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {results.map(r => (
-                  <tr key={r.id} style={styles.tr}>
-                    <td style={{ ...styles.td, fontWeight: 'bold' }}>{r.date}</td>
-                    <td style={styles.td}>{r.student_name} ({r.student_roll})</td>
-                    <td style={styles.td}>{r.test_name}</td>
-                    <td style={styles.td}>{r.total_score} pts</td>
-                    <td style={styles.td}>
-                      <span className={`badge ${r.grade === 'S' || r.grade === 'A' ? 'badge-success' : r.grade === 'B' ? 'badge-warning' : 'badge-danger'}`}>
-                        Grade {r.grade}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -215,35 +213,35 @@ const styles = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 24,
+    gap: 32,
+    position: 'relative',
+    zIndex: 2,
   },
   header: {
     display: 'flex',
     alignItems: 'center',
     gap: 12,
     color: '#ffffff',
-    fontSize: 24,
+    fontFamily: 'var(--font-header)',
+    fontSize: 26,
+    fontWeight: 800,
   },
   subheader: {
     fontSize: 14,
     color: '#9ca3af',
     borderBottom: '1px solid rgba(255,255,255,0.06)',
-    paddingBottom: 20,
+    paddingBottom: 24,
     marginTop: -8,
   },
-  layout: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1.4fr',
-    gap: 24,
-    '@media (max-width: 900px)': {
-      gridTemplateColumns: '1fr',
-    }
-  },
+  layout: {},
   formCard: {
     padding: 24,
+    borderRadius: '20px',
   },
   formHeader: {
     fontSize: 18,
+    fontFamily: 'var(--font-header)',
+    fontWeight: 700,
     color: '#ffffff',
     marginBottom: 20,
     display: 'flex',
@@ -267,31 +265,7 @@ const styles = {
   },
   label: {
     fontSize: 13,
-    color: '#d1d5db',
-    fontWeight: 'bold',
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    textAlign: 'left',
-  },
-  theadRow: {
-    borderBottom: '1px solid rgba(255,255,255,0.08)',
-    background: 'rgba(255,255,255,0.02)',
-  },
-  th: {
-    padding: '14px 18px',
-    color: '#9ca3af',
-    fontWeight: 'bold',
-    fontSize: 12,
-    textTransform: 'uppercase',
-  },
-  tr: {
-    borderBottom: '1px solid rgba(255,255,255,0.05)',
-  },
-  td: {
-    padding: '14px 18px',
-    fontSize: 13,
-    color: '#e5e7eb',
+    color: '#cbd5e1',
+    fontWeight: '500',
   }
 };

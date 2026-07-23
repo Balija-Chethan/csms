@@ -170,7 +170,7 @@ export default function AdminPlacementPrep({ API_URL, token }) {
         </button>
       </div>
 
-      <div style={styles.layout}>
+      <div className="admin-users-layout" style={styles.layout}>
         {/* Form Panel */}
         <div className="glass-card" style={styles.formCard}>
           {mode === 'company' && (
@@ -290,28 +290,32 @@ const styles = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 24,
+    gap: 32,
+    position: 'relative',
+    zIndex: 2,
   },
   header: {
     display: 'flex',
     alignItems: 'center',
     gap: 12,
     color: '#ffffff',
-    fontSize: 24,
+    fontFamily: 'var(--font-header)',
+    fontSize: 26,
+    fontWeight: 800,
   },
   subheader: {
     fontSize: 14,
     color: '#9ca3af',
     borderBottom: '1px solid rgba(255,255,255,0.06)',
-    paddingBottom: 20,
+    paddingBottom: 24,
     marginTop: -8,
   },
   toggleContainer: {
     display: 'flex',
     gap: 10,
-    background: 'rgba(255,255,255,0.02)',
+    background: 'rgba(3, 7, 18, 0.45)',
     padding: 6,
-    borderRadius: 10,
+    borderRadius: 12,
     border: '1px solid rgba(255,255,255,0.05)',
   },
   toggleBtn: {
@@ -320,43 +324,42 @@ const styles = {
     border: 'none',
     color: '#9ca3af',
     padding: '10px 14px',
-    borderRadius: 6,
+    borderRadius: 8,
     cursor: 'pointer',
-    fontWeight: 'bold',
+    fontFamily: 'var(--font-header)',
+    fontWeight: '600',
     fontSize: 13,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
+    transition: 'all 0.2s',
   },
   toggleBtnActive: {
     flex: 1,
-    background: 'rgba(56, 189, 248, 0.15)',
-    border: '1px solid rgba(56, 189, 248, 0.3)',
+    background: 'rgba(56, 189, 248, 0.08)',
+    border: '1px solid rgba(56, 189, 248, 0.2)',
     color: '#38bdf8',
     padding: '10px 14px',
-    borderRadius: 6,
+    borderRadius: 8,
     cursor: 'pointer',
-    fontWeight: 'bold',
+    fontFamily: 'var(--font-header)',
+    fontWeight: '700',
     fontSize: 13,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
   },
-  layout: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1.3fr',
-    gap: 24,
-    '@media (max-width: 900px)': {
-      gridTemplateColumns: '1fr',
-    }
-  },
+  layout: {},
   formCard: {
     padding: 24,
+    borderRadius: '20px',
   },
   formTitle: {
     color: '#fff',
+    fontFamily: 'var(--font-header)',
+    fontWeight: 700,
     fontSize: 18,
     marginBottom: 16,
   },
@@ -372,7 +375,7 @@ const styles = {
   },
   label: {
     fontSize: 13,
-    color: '#d1d5db',
-    fontWeight: 'bold',
+    color: '#cbd5e1',
+    fontWeight: '500',
   }
 };

@@ -119,7 +119,7 @@ export default function AdminUsers({ API_URL, token }) {
         Directly register student accounts, assign initial course batches, and audit system user credentials.
       </p>
 
-      <div style={styles.layout}>
+      <div className="admin-users-layout" style={styles.layout}>
         {/* Create User Form */}
         <div className="glass-card" style={styles.formCard}>
           <h3 style={styles.formHeader}>
@@ -203,34 +203,34 @@ export default function AdminUsers({ API_URL, token }) {
             </div>
           </div>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={styles.table}>
+          <div className="table-container" style={{ margin: 0 }}>
+            <table className="custom-table">
               <thead>
-                <tr style={styles.theadRow}>
-                  <th style={styles.th}>Name</th>
-                  <th style={styles.th}>Roll No</th>
-                  <th style={styles.th}>Email</th>
-                  <th style={styles.th}>Role</th>
-                  <th style={styles.th}>Batch</th>
-                  <th style={styles.th}>Action</th>
+                <tr>
+                  <th>Name</th>
+                  <th>Roll No</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Batch</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredUsers.map(u => (
-                  <tr key={u.id} style={styles.tr}>
-                    <td style={{ ...styles.td, fontWeight: 'bold' }}>{u.full_name}</td>
-                    <td style={styles.td}>{u.roll_number}</td>
-                    <td style={styles.td}>{u.email}</td>
-                    <td style={styles.td}>
+                  <tr key={u.id}>
+                    <td style={{ fontWeight: '700', color: '#ffffff' }}>{u.full_name}</td>
+                    <td style={{ fontFamily: 'var(--font-mono)' }}>{u.roll_number}</td>
+                    <td>{u.email}</td>
+                    <td>
                       <span className={`badge ${u.role === 'admin' ? 'badge-danger' : 'badge-success'}`}>
                         {u.role.toUpperCase()}
                       </span>
                     </td>
-                    <td style={styles.td}>{u.batch}</td>
-                    <td style={styles.td}>
+                    <td>{u.batch}</td>
+                    <td>
                       <button 
                         onClick={() => handleDeleteUser(u.id, u.full_name)}
-                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 4 }}
+                        style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: 4, fontWeight: '600' }}
                         title="Delete User"
                       >
                         Delete
@@ -252,35 +252,35 @@ const styles = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 24,
+    gap: 32,
+    position: 'relative',
+    zIndex: 2,
   },
   header: {
     display: 'flex',
     alignItems: 'center',
     gap: 12,
     color: '#ffffff',
-    fontSize: 24,
+    fontFamily: 'var(--font-header)',
+    fontSize: 26,
+    fontWeight: 800,
   },
   subheader: {
     fontSize: 14,
     color: '#9ca3af',
     borderBottom: '1px solid rgba(255,255,255,0.06)',
-    paddingBottom: 20,
+    paddingBottom: 24,
     marginTop: -8,
   },
-  layout: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1.4fr',
-    gap: 24,
-    '@media (max-width: 900px)': {
-      gridTemplateColumns: '1fr',
-    }
-  },
+  layout: {},
   formCard: {
     padding: 24,
+    borderRadius: '20px',
   },
   formHeader: {
     fontSize: 18,
+    fontFamily: 'var(--font-header)',
+    fontWeight: 700,
     color: '#ffffff',
     marginBottom: 20,
     display: 'flex',
@@ -304,31 +304,7 @@ const styles = {
   },
   label: {
     fontSize: 13,
-    color: '#d1d5db',
-    fontWeight: 'bold',
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    textAlign: 'left',
-  },
-  theadRow: {
-    borderBottom: '1px solid rgba(255,255,255,0.08)',
-    background: 'rgba(255,255,255,0.02)',
-  },
-  th: {
-    padding: '14px 18px',
-    color: '#9ca3af',
-    fontWeight: 'bold',
-    fontSize: 12,
-    textTransform: 'uppercase',
-  },
-  tr: {
-    borderBottom: '1px solid rgba(255,255,255,0.05)',
-  },
-  td: {
-    padding: '14px 18px',
-    fontSize: 13,
-    color: '#e5e7eb',
+    color: '#cbd5e1',
+    fontWeight: '500',
   }
 };

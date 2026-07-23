@@ -27,6 +27,7 @@ def create_mongo_indexes(db):
         db['leave_requests'].create_index([('student_id', 1)])
         db['chat_messages'].create_index([('batch_id', 1)])
         db['chat_messages'].create_index([('timestamp', 1)])
+        db['password_reset_otps'].create_index([('email', 1)])
         print("[MongoDB] Indexes verified/created successfully.")
     except Exception as e:
         print(f"[MongoDB Error] Failed to create indexes: {e}")
@@ -99,6 +100,11 @@ def get_all_from_mongo(collection_name):
 def restore_from_mongo(force=False):
     """Restore all data from MongoDB Atlas into active Django ORM models on startup/login."""
     global _last_restore_time
+    now = time.time()
+    
+    # Throttle requests: Only check MongoDB for updates if it has been at least 15 seconds since the last check/restore.
+    if not force and _last_restore_time > 0 and (now - _last_restore_time) < RESTORE_THROTTLE_SECONDS:
+        return
 
     import sys
     if 'test' in sys.argv:
@@ -118,6 +124,8 @@ def restore_from_mongo(force=False):
 
     if not force and _last_restore_time > 0 and last_write_time <= _last_restore_time:
         # SQLite is already up-to-date with MongoDB
+        # Update local tracking time to avoid checking again for 15 seconds
+        _last_restore_time = now
         return
 
     try:
@@ -125,7 +133,7 @@ def restore_from_mongo(force=False):
             User, Batch, BatchEnrollment, Task, Submission,
             LeetcodeChallenge, LeetcodeSubmission, StudyNote,
             MockDriveResult, AttendanceLog, LeaveRequest, ChatMessage,
-            PlacementCompany, PlacementRound, PlacementResource
+            PlacementCompany, PlacementRound, PlacementResource, PasswordResetOTP
         )
         from datetime import datetime, date, timedelta
         from django.utils import timezone
@@ -593,6 +601,35 @@ def restore_from_mongo(force=False):
                                 ChatMessage.objects.filter(id=msg.id).update(timestamp=chat_time)
                 except Exception:
                     pass
+
+        # 14. Restore PasswordResetOTPs
+        try:
+            mongo_otps = list(db['password_reset_otps'].find({}))
+            for o in mongo_otps:
+                raw_id = o.get('_id') or o.get('id')
+                email = o.get('email')
+                if email:
+                    try:
+                        otp_record = PasswordResetOTP.objects.filter(email=email).first()
+                        if not otp_record:
+                            otp_record = PasswordResetOTP(
+                                email=email,
+                                otp_hash=o.get('otp_hash'),
+                                expires_at=parse_datetime(o.get('expires_at')) or timezone.now(),
+                                attempts=o.get('attempts', 0),
+                                is_verified=o.get('is_verified', False),
+                                is_used=o.get('is_used', False)
+                            )
+                            if str(raw_id).isdigit():
+                                otp_record.id = int(raw_id)
+                            otp_record.save()
+                            created_time = parse_datetime(o.get('created_at'))
+                            if created_time:
+                                PasswordResetOTP.objects.filter(id=otp_record.id).update(created_at=created_time)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
 
         # Update local sync tracking timestamp
         _last_restore_time = last_write_time if last_write_time > 0 else time.time()

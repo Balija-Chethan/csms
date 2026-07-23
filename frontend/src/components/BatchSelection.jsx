@@ -58,45 +58,54 @@ export default function BatchSelection({ API_URL, token, onEnrollmentRequested }
   };
 
   return (
-    <div style={{ maxWidth: 1100, margin: '40px auto', padding: '0 20px', color: '#f8fafc' }}>
-      <div style={{ textAlign: 'center', marginBottom: 40 }}>
+    <div style={{ maxWidth: 1100, margin: '60px auto', padding: '0 24px', color: '#f8fafc', position: 'relative', zIndex: 2 }}>
+      <div style={{ textAlign: 'center', marginBottom: 48 }}>
         <span style={{ 
-          background: 'rgba(99, 102, 241, 0.15)', 
-          color: '#818cf8', 
+          background: 'rgba(59, 130, 246, 0.08)', 
+          color: 'var(--primary)', 
           padding: '6px 16px', 
           borderRadius: 20, 
-          fontSize: '0.85rem', 
-          fontWeight: 600,
-          border: '1px solid rgba(99, 102, 241, 0.3)',
-          letterSpacing: '0.5px'
+          fontSize: '0.8rem', 
+          fontWeight: 700,
+          border: '1px solid rgba(59, 130, 246, 0.2)',
+          letterSpacing: '1px'
         }}>
           STUDENT ONBOARDING
         </span>
-        <h1 style={{ fontSize: '2.4rem', fontWeight: 700, margin: '16px 0 10px 0', background: 'linear-gradient(135deg, #fff 0%, #cbd5e1 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+        <h1 style={{ 
+          fontSize: '2.5rem', 
+          fontFamily: 'var(--font-header)',
+          fontWeight: 800, 
+          margin: '16px 0 12px 0', 
+          background: 'linear-gradient(135deg, #ffffff 0%, #94a3b8 100%)', 
+          WebkitBackgroundClip: 'text', 
+          WebkitTextFillColor: 'transparent',
+          letterSpacing: '-0.02em'
+        }}>
           Select Your Training Batch
         </h1>
-        <p style={{ color: '#94a3b8', fontSize: '1.05rem', maxWidth: 650, margin: '0 auto' }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: '1.05rem', maxWidth: 650, margin: '0 auto', lineHeight: 1.6 }}>
           Welcome to CSMS! Choose your specialized training batch below to request enrollment. Once approved by an administrator, you will get access to all batch tasks, notes, and dashboards.
         </p>
       </div>
 
       {error && (
-        <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#fca5a5', padding: '14px 18px', borderRadius: 12, marginBottom: 24, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#f87171', padding: '14px 18px', borderRadius: 12, marginBottom: 24, display: 'flex', alignItems: 'center', gap: 10, fontSize: 14 }}>
           <AlertCircle size={20} />
-          <span>{error}</span>
+          <span style={{ fontWeight: 500 }}>{error}</span>
         </div>
       )}
 
       {successMsg && (
-        <div style={{ background: 'rgba(34, 197, 94, 0.15)', border: '1px solid rgba(34, 197, 94, 0.4)', color: '#86efac', padding: '14px 18px', borderRadius: 12, marginBottom: 24, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', color: '#34d399', padding: '14px 18px', borderRadius: 12, marginBottom: 24, display: 'flex', alignItems: 'center', gap: 10, fontSize: 14 }}>
           <CheckCircle2 size={20} />
-          <span>{successMsg}</span>
+          <span style={{ fontWeight: 500 }}>{successMsg}</span>
         </div>
       )}
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '60px 0', color: '#94a3b8' }}>
-          <h3>Loading available batches...</h3>
+        <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
+          <h3 style={{ fontFamily: 'var(--font-header)', fontWeight: 600 }}>Loading available batches...</h3>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 24 }}>
@@ -105,55 +114,54 @@ export default function BatchSelection({ API_URL, token, onEnrollmentRequested }
             const isSubmitting = submittingId === b.id;
 
             return (
-              <div key={b.id} style={{
-                background: 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)',
-                border: '1px solid #334155',
-                borderRadius: 16,
-                padding: 24,
+              <div key={b.id} className="glass-card" style={{
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
-                transition: 'transform 0.2s ease, border-color 0.2s ease',
-                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)'
+                padding: 28,
+                borderRadius: '24px',
+                transition: 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s',
               }}>
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
                     <div style={{ 
                       width: 44, 
                       height: 44, 
                       borderRadius: 12, 
-                      background: 'rgba(99, 102, 241, 0.2)', 
-                      color: '#818cf8', 
+                      background: 'rgba(59, 130, 246, 0.08)', 
+                      color: 'var(--primary)', 
                       display: 'flex', 
                       alignItems: 'center', 
-                      justifyContent: 'center' 
+                      justifyContent: 'center',
+                      border: '1px solid rgba(59, 130, 246, 0.15)'
                     }}>
                       <BookOpen size={22} />
                     </div>
                     <span style={{ 
-                      background: 'rgba(30, 41, 59, 0.8)', 
-                      border: '1px solid #475569', 
-                      color: '#cbd5e1', 
+                      background: 'rgba(3, 7, 18, 0.45)', 
+                      border: '1px solid rgba(255, 255, 255, 0.05)', 
+                      color: seatsAvailable > 0 ? '#34d399' : '#f87171', 
                       fontSize: '0.78rem', 
-                      padding: '4px 10px', 
-                      borderRadius: 20 
+                      padding: '4px 12px', 
+                      borderRadius: 20,
+                      fontWeight: '700'
                     }}>
-                      {seatsAvailable} Seats Left
+                      {seatsAvailable > 0 ? `${seatsAvailable} Seats Left` : 'Full'}
                     </span>
                   </div>
 
-                  <h3 style={{ fontSize: '1.35rem', fontWeight: 600, color: '#f8fafc', marginBottom: 8 }}>
+                  <h3 style={{ fontSize: '1.25rem', fontFamily: 'var(--font-header)', fontWeight: 700, color: '#f8fafc', marginBottom: 8 }}>
                     {b.name}
                   </h3>
-                  <p style={{ color: '#94a3b8', fontSize: '0.92rem', lineHeight: 1.5, marginBottom: 20 }}>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.6, marginBottom: 24 }}>
                     {b.description || "Comprehensive training program tailored for campus placements."}
                   </p>
                 </div>
 
                 <div>
                   <div style={{ 
-                    borderTop: '1px solid #334155', 
-                    paddingTop: 16, 
+                    borderTop: '1px solid rgba(255,255,255,0.06)', 
+                    paddingTop: 18, 
                     marginBottom: 20, 
                     display: 'flex', 
                     flexDirection: 'column', 
@@ -162,34 +170,23 @@ export default function BatchSelection({ API_URL, token, onEnrollmentRequested }
                     color: '#cbd5e1'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Layers size={16} color="#818cf8" />
-                      <span>Capacity: {b.enrolled_count || 0} / {b.max_seats || 60} Enrolled</span>
+                      <Layers size={16} color="var(--primary)" />
+                      <span style={{ fontWeight: '500' }}>Capacity: {b.enrolled_count || 0} / {b.max_seats || 60} Enrolled</span>
                     </div>
                   </div>
 
                   <button
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || seatsAvailable <= 0}
                     onClick={() => handleJoinBatch(b.id)}
+                    className="btn-primary"
                     style={{
                       width: '100%',
-                      padding: '12px 18px',
-                      borderRadius: 10,
-                      border: 'none',
-                      background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                      color: '#ffffff',
-                      fontWeight: 600,
-                      fontSize: '0.95rem',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
                       justifyContent: 'center',
-                      gap: 8,
-                      transition: 'opacity 0.2s ease',
-                      boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)'
+                      borderRadius: 12,
                     }}
                   >
                     {isSubmitting ? "Sending Request..." : "Join Batch"}
-                    {!isSubmitting && <ArrowRight size={18} />}
+                    {!isSubmitting && <ArrowRight size={16} />}
                   </button>
                 </div>
               </div>

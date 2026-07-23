@@ -5,6 +5,9 @@ urlpatterns = [
     # Auth & Profile
     path('auth/register/', views.register_student, name='register'),
     path('auth/login/', views.login_student, name='login'),
+    path('auth/forgot-password/', views.forgot_password, name='forgot_password'),
+    path('auth/verify-otp/', views.verify_otp, name='verify_otp'),
+    path('auth/reset-password/', views.reset_password, name='reset_password'),
     path('student/profile/', views.student_profile, name='profile'),
     
     # Student Operations

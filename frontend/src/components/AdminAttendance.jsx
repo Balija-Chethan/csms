@@ -51,37 +51,37 @@ export default function AdminAttendance({ API_URL, token }) {
           <p style={{ color: '#9ca3af', marginTop: 8 }}>Students have not logged session times today or in past days.</p>
         </div>
       ) : (
-        <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
-          <table style={styles.table}>
+        <div className="table-container" style={{ margin: 0 }}>
+          <table className="custom-table">
             <thead>
-              <tr style={styles.theadRow}>
-                <th style={styles.th}>Date</th>
-                <th style={styles.th}>Student Name</th>
-                <th style={styles.th}>Roll No</th>
-                <th style={styles.th}>First Check-In</th>
-                <th style={styles.th}>Last Check-Out</th>
-                <th style={styles.th}>Session Time</th>
-                <th style={styles.th}>Daily Status</th>
+              <tr>
+                <th>Date</th>
+                <th>Student Name</th>
+                <th>Roll No</th>
+                <th>First Check-In</th>
+                <th>Last Check-Out</th>
+                <th>Session Time</th>
+                <th>Daily Status</th>
               </tr>
             </thead>
             <tbody>
               {logs.map((log, index) => (
-                <tr key={index} style={styles.tr}>
-                  <td style={{ ...styles.td, fontWeight: 'bold' }}>{log.date}</td>
-                  <td style={styles.td}>{log.student_name}</td>
-                  <td style={styles.td}>{log.student_roll || 'N/A'}</td>
-                  <td style={styles.td}>
+                <tr key={index}>
+                  <td style={{ fontWeight: '700', color: '#ffffff' }}>{log.date}</td>
+                  <td>{log.student_name}</td>
+                  <td style={{ fontFamily: 'var(--font-mono)' }}>{log.student_roll || 'N/A'}</td>
+                  <td style={{ fontFamily: 'var(--font-mono)' }}>
                     {log.check_in ? new Date(log.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'N/A'}
                   </td>
-                  <td style={styles.td}>
+                  <td style={{ fontFamily: 'var(--font-mono)' }}>
                     {log.check_out ? new Date(log.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'N/A'}
                   </td>
-                  <td style={styles.td}>{formatDuration(log.total_time)}</td>
-                  <td style={styles.td}>
+                  <td style={{ fontFamily: 'var(--font-mono)' }}>{formatDuration(log.total_time)}</td>
+                  <td>
                     {log.status === 'present' ? (
                       <span className="badge badge-success">Present</span>
                     ) : log.status === 'leave' ? (
-                      <span className="badge badge-warning" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>Leave</span>
+                      <span className="badge badge-info">Leave</span>
                     ) : (
                       <span className="badge badge-danger">Absent</span>
                     )}
@@ -100,46 +100,26 @@ const styles = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 24,
+    gap: 32,
+    position: 'relative',
+    zIndex: 2,
   },
   headerRow: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderBottom: '1px solid rgba(255,255,255,0.06)',
-    paddingBottom: 20,
+    paddingBottom: 24,
   },
   header: {
     color: '#ffffff',
+    fontFamily: 'var(--font-header)',
     fontSize: 26,
+    fontWeight: 800,
     marginBottom: 6,
   },
   subheader: {
     color: '#9ca3af',
     fontSize: 14,
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    textAlign: 'left',
-  },
-  theadRow: {
-    borderBottom: '1px solid rgba(255,255,255,0.08)',
-    background: 'rgba(255,255,255,0.02)',
-  },
-  th: {
-    padding: '16px 20px',
-    color: '#9ca3af',
-    fontWeight: 'bold',
-    fontSize: 13,
-    textTransform: 'uppercase',
-  },
-  tr: {
-    borderBottom: '1px solid rgba(255,255,255,0.05)',
-  },
-  td: {
-    padding: '16px 20px',
-    fontSize: 14,
-    color: '#e5e7eb',
   }
 };

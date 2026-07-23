@@ -1,7 +1,7 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { 
   LayoutDashboard, BookOpen, BarChart3, Users, 
-  Settings, LogOut, ChevronDown, ChevronRight, ClipboardList, Clock, ShieldAlert, Award
+  Settings, LogOut, ChevronDown, ChevronRight, ClipboardList, Clock, ShieldAlert, Award, Menu
 } from 'lucide-react';
 
 const Login = lazy(() => import('./components/Login'));
@@ -45,6 +45,7 @@ export default function App() {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [onlineStudents, setOnlineStudents] = useState(1);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [enrollmentStatus, setEnrollmentStatus] = useState(null);
   const [enrollmentData, setEnrollmentData] = useState(null);
@@ -214,15 +215,31 @@ export default function App() {
       <header style={styles.header}>
         <div style={styles.headerLeft}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button 
+              className="mobile-toggle"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#fff',
+                cursor: 'pointer',
+                padding: '4px 8px 4px 0',
+                display: 'none',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <Menu size={24} />
+            </button>
             <img src="/logo.jpg" alt="CSMS Logo" style={{ height: 40, width: 'auto', borderRadius: 6, objectFit: 'contain' }} />
             <div style={styles.logo}>CSMS</div>
           </div>
         </div>
 
         <div style={styles.headerRight}>
-          <div className="live-online-pill">
+          <div className="live-online-pill" style={{ marginRight: 16 }}>
             <span className="live-dot"></span>
-            <span style={{ fontSize: 12, fontWeight: '700', color: '#34d399' }}>
+            <span style={{ fontSize: 12, fontWeight: '700', color: '#10b981' }}>
               {onlineStudents} Online
             </span>
           </div>
@@ -258,8 +275,12 @@ export default function App() {
 
       {/* Main Body */}
       <div style={styles.bodyLayout}>
+        {/* Sidebar Panel overlay on mobile */}
+        {sidebarOpen && (
+          <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
+        )}
         {/* Sidebar Panel */}
-        <aside style={styles.sidebar}>
+        <aside className={`app-sidebar ${sidebarOpen ? 'open' : ''}`} style={styles.sidebar}>
           <div style={styles.sidebarBrand}>
             <img src="/logo.jpg" alt="CSMS Logo" style={styles.sidebarLogo} />
             <span style={styles.sidebarBrandText}>CSMS</span>
@@ -269,91 +290,91 @@ export default function App() {
               // ADMIN SIDEBAR NAVIGATION
               <>
                 <button 
-                  style={activeTab === 'admin_dashboard' ? styles.navItemActive : styles.navItem}
-                  onClick={() => setActiveTab('admin_dashboard')}
+                  className={activeTab === 'admin_dashboard' ? "nav-btn-active" : "nav-btn"}
+                  onClick={() => { setActiveTab('admin_dashboard'); setSidebarOpen(false); }}
                 >
                   <LayoutDashboard size={18} />
                   Admin Workspace
                 </button>
 
                 <button 
-                  style={activeTab === 'admin_pending_requests' ? styles.navItemActive : styles.navItem}
-                  onClick={() => setActiveTab('admin_pending_requests')}
+                  className={activeTab === 'admin_pending_requests' ? "nav-btn-active" : "nav-btn"}
+                  onClick={() => { setActiveTab('admin_pending_requests'); setSidebarOpen(false); }}
                 >
                   <Clock size={18} />
-                  Pending Batch Requests
+                  Pending Requests
                 </button>
 
                 <button 
-                  style={activeTab === 'admin_allocation' ? styles.navItemActive : styles.navItem}
-                  onClick={() => setActiveTab('admin_allocation')}
+                  className={activeTab === 'admin_allocation' ? "nav-btn-active" : "nav-btn"}
+                  onClick={() => { setActiveTab('admin_allocation'); setSidebarOpen(false); }}
                 >
                   <Users size={18} />
                   Batch Allocation
                 </button>
 
                 <button 
-                  style={activeTab === 'admin_users' ? styles.navItemActive : styles.navItem}
-                  onClick={() => setActiveTab('admin_users')}
+                  className={activeTab === 'admin_users' ? "nav-btn-active" : "nav-btn"}
+                  onClick={() => { setActiveTab('admin_users'); setSidebarOpen(false); }}
                 >
                   <Users size={18} />
-                  User & Student Directory
+                  User Directory
                 </button>
 
                 <button 
-                  style={activeTab === 'admin_tasks' ? styles.navItemActive : styles.navItem}
-                  onClick={() => setActiveTab('admin_tasks')}
+                  className={activeTab === 'admin_tasks' ? "nav-btn-active" : "nav-btn"}
+                  onClick={() => { setActiveTab('admin_tasks'); setSidebarOpen(false); }}
                 >
                   <ClipboardList size={18} />
-                  Tasks & 10-Day LeetCode
+                  Tasks & LeetCode
                 </button>
 
                 <button 
-                  style={activeTab === 'admin_grades' ? styles.navItemActive : styles.navItem}
-                  onClick={() => setActiveTab('admin_grades')}
+                  className={activeTab === 'admin_grades' ? "nav-btn-active" : "nav-btn"}
+                  onClick={() => { setActiveTab('admin_grades'); setSidebarOpen(false); }}
                 >
                   <Award size={18} />
                   Grade Submissions
                 </button>
 
                 <button 
-                  style={activeTab === 'admin_mock_results' ? styles.navItemActive : styles.navItem}
-                  onClick={() => setActiveTab('admin_mock_results')}
+                  className={activeTab === 'admin_mock_results' ? "nav-btn-active" : "nav-btn"}
+                  onClick={() => { setActiveTab('admin_mock_results'); setSidebarOpen(false); }}
                 >
                   <Award size={18} />
-                  Mock Placement Scores
+                  Placement Scores
                 </button>
 
                 <button 
-                  style={activeTab === 'admin_notes' ? styles.navItemActive : styles.navItem}
-                  onClick={() => setActiveTab('admin_notes')}
+                  className={activeTab === 'admin_notes' ? "nav-btn-active" : "nav-btn"}
+                  onClick={() => { setActiveTab('admin_notes'); setSidebarOpen(false); }}
                 >
                   <BookOpen size={18} />
-                  Study Notes Manager
+                  Notes Manager
                 </button>
 
                 <button 
-                  style={activeTab === 'admin_placement_prep' ? styles.navItemActive : styles.navItem}
-                  onClick={() => setActiveTab('admin_placement_prep')}
+                  className={activeTab === 'admin_placement_prep' ? "nav-btn-active" : "nav-btn"}
+                  onClick={() => { setActiveTab('admin_placement_prep'); setSidebarOpen(false); }}
                 >
                   <BookOpen size={18} />
-                  Placement Prep Manager
+                  Prep Manager
                 </button>
 
                 <button 
-                  style={activeTab === 'admin_leaves' ? styles.navItemActive : styles.navItem}
-                  onClick={() => setActiveTab('admin_leaves')}
+                  className={activeTab === 'admin_leaves' ? "nav-btn-active" : "nav-btn"}
+                  onClick={() => { setActiveTab('admin_leaves'); setSidebarOpen(false); }}
                 >
                   <ShieldAlert size={18} />
-                  Audit Leave Requests
+                  Audit Leaves
                 </button>
 
                 <button 
-                  style={activeTab === 'admin_attendance' ? styles.navItemActive : styles.navItem}
-                  onClick={() => setActiveTab('admin_attendance')}
+                  className={activeTab === 'admin_attendance' ? "nav-btn-active" : "nav-btn"}
+                  onClick={() => { setActiveTab('admin_attendance'); setSidebarOpen(false); }}
                 >
                   <Clock size={18} />
-                  Attendance Logs Audit
+                  Attendance Audit
                 </button>
 
                 {/* Admin Account Settings */}
@@ -369,8 +390,9 @@ export default function App() {
                   {accountOpen && (
                     <div style={styles.submenuItems}>
                       <button 
-                        style={activeTab === 'admin_change_password' ? styles.subItemActive : styles.subItem}
-                        onClick={() => setActiveTab('admin_change_password')}
+                        className={activeTab === 'admin_change_password' ? "nav-btn-active" : "nav-btn"}
+                        style={{ paddingLeft: 24 }}
+                        onClick={() => { setActiveTab('admin_change_password'); setSidebarOpen(false); }}
                       >
                         🔐 Change Password
                       </button>
@@ -382,8 +404,8 @@ export default function App() {
               // STUDENT SIDEBAR NAVIGATION
               <>
                 <button 
-                  style={activeTab === 'dashboard' ? styles.navItemActive : styles.navItem}
-                  onClick={() => setActiveTab('dashboard')}
+                  className={activeTab === 'dashboard' ? "nav-btn-active" : "nav-btn"}
+                  onClick={() => { setActiveTab('dashboard'); setSidebarOpen(false); }}
                 >
                   <LayoutDashboard size={18} />
                   Dashboard
@@ -404,26 +426,30 @@ export default function App() {
                       {learningOpen && (
                         <div style={styles.submenuItems}>
                           <button 
-                            style={activeTab === 'tasks' ? styles.subItemActive : styles.subItem}
-                            onClick={() => setActiveTab('tasks')}
+                            className={activeTab === 'tasks' ? "nav-btn-active" : "nav-btn"}
+                            style={{ paddingLeft: 24 }}
+                            onClick={() => { setActiveTab('tasks'); setSidebarOpen(false); }}
                           >
                             My Tasks
                           </button>
                           <button 
-                            style={activeTab === 'leetcode' ? styles.subItemActive : styles.subItem}
-                            onClick={() => setActiveTab('leetcode')}
+                            className={activeTab === 'leetcode' ? "nav-btn-active" : "nav-btn"}
+                            style={{ paddingLeft: 24 }}
+                            onClick={() => { setActiveTab('leetcode'); setSidebarOpen(false); }}
                           >
                             LeetCode Challenges
                           </button>
                           <button 
-                            style={activeTab === 'notes' ? styles.subItemActive : styles.subItem}
-                            onClick={() => setActiveTab('notes')}
+                            className={activeTab === 'notes' ? "nav-btn-active" : "nav-btn"}
+                            style={{ paddingLeft: 24 }}
+                            onClick={() => { setActiveTab('notes'); setSidebarOpen(false); }}
                           >
                             Study Notes
                           </button>
                           <button 
-                            style={activeTab === 'placement_prep' ? styles.subItemActive : styles.subItem}
-                            onClick={() => setActiveTab('placement_prep')}
+                            className={activeTab === 'placement_prep' ? "nav-btn-active" : "nav-btn"}
+                            style={{ paddingLeft: 24 }}
+                            onClick={() => { setActiveTab('placement_prep'); setSidebarOpen(false); }}
                           >
                             Placement Prep
                           </button>
@@ -444,20 +470,23 @@ export default function App() {
                       {performanceOpen && (
                         <div style={styles.submenuItems}>
                           <button 
-                            style={activeTab === 'grades' ? styles.subItemActive : styles.subItem}
-                            onClick={() => setActiveTab('grades')}
+                            className={activeTab === 'grades' ? "nav-btn-active" : "nav-btn"}
+                            style={{ paddingLeft: 24 }}
+                            onClick={() => { setActiveTab('grades'); setSidebarOpen(false); }}
                           >
                             My Grades & Mocks
                           </button>
                           <button 
-                            style={activeTab === 'leaderboard' ? styles.subItemActive : styles.subItem}
-                            onClick={() => setActiveTab('leaderboard')}
+                            className={activeTab === 'leaderboard' ? "nav-btn-active" : "nav-btn"}
+                            style={{ paddingLeft: 24 }}
+                            onClick={() => { setActiveTab('leaderboard'); setSidebarOpen(false); }}
                           >
                             Leaderboard
                           </button>
                           <button 
-                            style={activeTab === 'attendance' ? styles.subItemActive : styles.subItem}
-                            onClick={() => setActiveTab('attendance')}
+                            className={activeTab === 'attendance' ? "nav-btn-active" : "nav-btn"}
+                            style={{ paddingLeft: 24 }}
+                            onClick={() => { setActiveTab('attendance'); setSidebarOpen(false); }}
                           >
                             Attendance Tracker
                           </button>
@@ -467,8 +496,8 @@ export default function App() {
 
                     {/* Chat */}
                     <button 
-                      style={activeTab === 'chat' ? styles.navItemActive : styles.navItem}
-                      onClick={() => setActiveTab('chat')}
+                      className={activeTab === 'chat' ? "nav-btn-active" : "nav-btn"}
+                      onClick={() => { setActiveTab('chat'); setSidebarOpen(false); }}
                     >
                       <Users size={18} />
                       Batch Group Chat
@@ -490,15 +519,17 @@ export default function App() {
                     <div style={styles.submenuItems}>
                       {dashboardData?.status === 'allocated' && (
                         <button 
-                          style={activeTab === 'leaves' ? styles.subItemActive : styles.subItem}
-                          onClick={() => setActiveTab('leaves')}
+                          className={activeTab === 'leaves' ? "nav-btn-active" : "nav-btn"}
+                          style={{ paddingLeft: 24 }}
+                          onClick={() => { setActiveTab('leaves'); setSidebarOpen(false); }}
                         >
                           Leave Application
                         </button>
                       )}
                       <button 
-                        style={activeTab === 'profile' ? styles.subItemActive : styles.subItem}
-                        onClick={() => setActiveTab('profile')}
+                        className={activeTab === 'profile' ? "nav-btn-active" : "nav-btn"}
+                        style={{ paddingLeft: 24 }}
+                        onClick={() => { setActiveTab('profile'); setSidebarOpen(false); }}
                       >
                         My Profile
                       </button>
@@ -667,20 +698,8 @@ const styles = {
     zIndex: 1,
   },
   sidebar: {
-    width: 260,
-    borderRight: '1px solid var(--border-color)',
-    background: 'rgba(15, 23, 42, 0.25)',
     display: 'flex',
     flexDirection: 'column',
-    justifyContent: 'space-between',
-    padding: 20,
-    height: 'calc(100vh - 72px)',
-    position: 'sticky',
-    top: 72,
-    overflowY: 'auto',
-    '@media (max-width: 768px)': {
-      display: 'none',
-    }
   },
   sidebarBrand: {
     display: 'flex',
@@ -708,43 +727,6 @@ const styles = {
     flexDirection: 'column',
     gap: 8,
   },
-  navItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-    background: 'none',
-    border: 'none',
-    color: '#9ca3af',
-    width: '100%',
-    textAlign: 'left',
-    padding: '12px 16px',
-    borderRadius: 8,
-    cursor: 'pointer',
-    fontFamily: 'var(--font-header)',
-    fontWeight: 600,
-    fontSize: 14,
-    transition: 'all 0.2s',
-    '&:hover': {
-      color: '#ffffff',
-      background: 'rgba(255,255,255,0.03)',
-    }
-  },
-  navItemActive: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-    background: 'var(--primary-glow)',
-    border: 'none',
-    color: 'var(--primary)',
-    width: '100%',
-    textAlign: 'left',
-    padding: '12px 16px',
-    borderRadius: 8,
-    cursor: 'pointer',
-    fontFamily: 'var(--font-header)',
-    fontWeight: 700,
-    fontSize: 14,
-  },
   submenuHeader: {
     display: 'flex',
     alignItems: 'center',
@@ -764,32 +746,8 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     gap: 4,
-    paddingLeft: 24,
+    paddingLeft: 0,
     marginTop: 4,
-  },
-  subItem: {
-    background: 'none',
-    border: 'none',
-    color: '#9ca3af',
-    width: '100%',
-    textAlign: 'left',
-    padding: '8px 16px',
-    borderRadius: 6,
-    cursor: 'pointer',
-    fontSize: 13,
-    transition: 'all 0.2s',
-  },
-  subItemActive: {
-    background: 'rgba(255,255,255,0.05)',
-    border: 'none',
-    color: 'var(--primary)',
-    width: '100%',
-    textAlign: 'left',
-    padding: '8px 16px',
-    borderRadius: 6,
-    cursor: 'pointer',
-    fontSize: 13,
-    fontWeight: 'bold',
   },
   logoutBtn: {
     display: 'flex',
@@ -807,11 +765,14 @@ const styles = {
     fontWeight: 600,
     fontSize: 14,
     marginTop: 20,
+    transition: 'all 0.2s',
   },
   contentPane: {
     flex: 1,
-    padding: 32,
+    padding: '32px 24px',
     overflowY: 'auto',
     height: 'calc(100vh - 72px)',
+    position: 'relative',
+    zIndex: 2,
   }
 };

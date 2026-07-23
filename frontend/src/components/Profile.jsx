@@ -152,33 +152,41 @@ const styles = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 24,
+    gap: 32,
+    position: 'relative',
+    zIndex: 2,
   },
   header: {
     color: '#ffffff',
+    fontFamily: 'var(--font-header)',
     fontSize: 26,
+    fontWeight: 800,
     borderBottom: '1px solid rgba(255,255,255,0.06)',
-    paddingBottom: 20,
+    paddingBottom: 24,
   },
   formLayout: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 20,
+    gap: 24,
   },
   sectionCard: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 16,
+    gap: 20,
+    borderRadius: '20px',
+    padding: 24,
   },
   sectionHeader: {
     fontSize: 16,
+    fontFamily: 'var(--font-header)',
+    fontWeight: 700,
     color: '#ffffff',
     display: 'flex',
     alignItems: 'center',
     gap: 8,
     borderBottom: '1px solid rgba(255,255,255,0.06)',
-    paddingBottom: 10,
-    marginBottom: 8,
+    paddingBottom: 12,
+    marginBottom: 4,
   },
   grid2: {
     display: 'grid',
@@ -192,7 +200,7 @@ const styles = {
   },
   label: {
     fontSize: 13,
-    color: '#d1d5db',
-    fontWeight: 'bold',
+    color: '#cbd5e1',
+    fontWeight: '500',
   }
 };

@@ -82,10 +82,10 @@ export default function AdminPendingRequests({ API_URL, token }) {
   });
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', color: '#f8fafc' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
+    <div style={{ maxWidth: 1100, margin: '0 auto', color: '#f8fafc', position: 'relative', zIndex: 2 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28, flexWrap: 'wrap', gap: 16 }}>
         <div>
-          <h2 style={{ fontSize: '1.8rem', fontWeight: 700, margin: 0, background: 'linear-gradient(135deg, #fff 0%, #cbd5e1 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          <h2 style={{ fontSize: '1.8rem', fontFamily: 'var(--font-header)', fontWeight: 800, margin: 0, background: 'linear-gradient(135deg, #fff 0%, #cbd5e1 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '-0.02em' }}>
             Pending Batch Requests
           </h2>
           <p style={{ color: '#94a3b8', fontSize: '0.95rem', margin: '4px 0 0 0' }}>
@@ -95,17 +95,10 @@ export default function AdminPendingRequests({ API_URL, token }) {
 
         <button
           onClick={fetchPendingRequests}
+          className="btn-secondary"
           style={{
-            padding: '8px 16px',
             borderRadius: 10,
-            border: '1px solid #334155',
-            background: '#1e293b',
-            color: '#cbd5e1',
-            fontWeight: 500,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6
+            padding: '10px 18px',
           }}
         >
           <RefreshCw size={16} />
@@ -114,69 +107,61 @@ export default function AdminPendingRequests({ API_URL, token }) {
       </div>
 
       {actionMsg && (
-        <div style={{ background: 'rgba(34, 197, 94, 0.15)', border: '1px solid rgba(34, 197, 94, 0.4)', color: '#86efac', padding: '12px 18px', borderRadius: 12, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', color: '#34d399', padding: '12px 18px', borderRadius: 12, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
           <CheckCircle2 size={18} />
-          <span>{actionMsg}</span>
+          <span style={{ fontWeight: 500 }}>{actionMsg}</span>
         </div>
       )}
 
       {error && (
-        <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#fca5a5', padding: '12px 18px', borderRadius: 12, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#f87171', padding: '12px 18px', borderRadius: 12, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
           <AlertCircle size={18} />
-          <span>{error}</span>
+          <span style={{ fontWeight: 500 }}>{error}</span>
         </div>
       )}
 
       <div style={{ position: 'relative', marginBottom: 24 }}>
-        <Search size={18} color="#94a3b8" style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)' }} />
+        <Search size={18} color="#4b5563" style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)' }} />
         <input
           type="text"
+          className="custom-input"
           placeholder="Search by student name, email, roll number, or requested batch..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           style={{
-            width: '100%',
-            padding: '12px 16px 12px 46px',
-            borderRadius: 12,
-            border: '1px solid #334155',
-            background: '#1e293b',
-            color: '#f8fafc',
+            paddingLeft: 46,
             fontSize: '0.95rem',
-            outline: 'none'
           }}
         />
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '60px 0', color: '#94a3b8' }}>
-          <h3>Loading pending batch requests...</h3>
+        <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
+          <h3 style={{ fontFamily: 'var(--font-header)', fontWeight: 600 }}>Loading pending batch requests...</h3>
         </div>
       ) : filteredRequests.length === 0 ? (
-        <div style={{
-          background: '#1e293b',
-          border: '1px solid #334155',
-          borderRadius: 16,
+        <div className="glass-card" style={{
           padding: '48px 24px',
           textAlign: 'center',
           color: '#94a3b8'
         }}>
-          <Clock size={40} color="#64748b" style={{ marginBottom: 12 }} />
-          <h3>No Pending Batch Requests</h3>
-          <p style={{ margin: '4px 0 0 0', fontSize: '0.95rem' }}>
+          <Clock size={40} color="#475569" style={{ marginBottom: 12 }} />
+          <h3 style={{ fontFamily: 'var(--font-header)', fontWeight: 700, color: '#ffffff' }}>No Pending Batch Requests</h3>
+          <p style={{ margin: '6px 0 0 0', fontSize: '0.95rem' }}>
             All student batch requests have been processed.
           </p>
         </div>
       ) : (
-        <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 16, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.95rem' }}>
+        <div className="table-container" style={{ margin: 0 }}>
+          <table className="custom-table">
             <thead>
-              <tr style={{ background: '#0f172a', borderBottom: '1px solid #334155', color: '#94a3b8', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                <th style={{ padding: '16px 20px' }}>Student Name</th>
-                <th style={{ padding: '16px 20px' }}>Email</th>
-                <th style={{ padding: '16px 20px' }}>Roll Number</th>
-                <th style={{ padding: '16px 20px' }}>Requested Batch</th>
-                <th style={{ padding: '16px 20px' }}>Requested Date</th>
-                <th style={{ padding: '16px 20px', textAlign: 'right' }}>Actions</th>
+              <tr>
+                <th>Student Name</th>
+                <th>Email</th>
+                <th>Roll Number</th>
+                <th>Requested Batch</th>
+                <th>Requested Date</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -186,71 +171,58 @@ export default function AdminPendingRequests({ API_URL, token }) {
                 const formattedDate = reqDate ? new Date(reqDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A';
 
                 return (
-                  <tr key={req.id} style={{ borderBottom: '1px solid #334155', transition: 'background 0.15s ease' }}>
-                    <td style={{ padding: '16px 20px', fontWeight: 600, color: '#f8fafc' }}>
+                  <tr key={req.id}>
+                    <td style={{ fontWeight: '700', color: '#f8fafc' }}>
                       {req.student_name || 'N/A'}
                     </td>
-                    <td style={{ padding: '16px 20px', color: '#cbd5e1' }}>
+                    <td>
                       {req.student_email || 'N/A'}
                     </td>
-                    <td style={{ padding: '16px 20px', color: '#818cf8', fontWeight: 500 }}>
+                    <td style={{ color: 'var(--primary)', fontWeight: '700', fontFamily: 'var(--font-mono)' }}>
                       {req.student_roll || 'N/A'}
                     </td>
-                    <td style={{ padding: '16px 20px' }}>
-                      <span style={{ 
-                        background: 'rgba(99, 102, 241, 0.15)', 
-                        color: '#818cf8', 
-                        padding: '4px 12px', 
-                        borderRadius: 20, 
-                        fontWeight: 600, 
-                        fontSize: '0.85rem' 
+                    <td>
+                      <span className="badge" style={{ 
+                        background: 'rgba(59, 130, 246, 0.08)', 
+                        color: 'var(--primary)', 
+                        borderColor: 'rgba(59, 130, 246, 0.2)',
+                        fontWeight: '700', 
                       }}>
                         {req.batch_name || 'N/A'}
                       </span>
                     </td>
-                    <td style={{ padding: '16px 20px', color: '#94a3b8', fontSize: '0.88rem' }}>
+                    <td style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>
                       {formattedDate}
                     </td>
-                    <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                    <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
                         <button
                           disabled={isProcessing}
                           onClick={() => handleApprove(req.id)}
+                          className="btn-primary"
                           style={{
                             padding: '8px 14px',
-                            borderRadius: 8,
-                            border: 'none',
-                            background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-                            color: '#fff',
-                            fontWeight: 600,
-                            fontSize: '0.85rem',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 6
+                            background: 'rgba(16, 185, 129, 0.08)',
+                            border: '1px solid rgba(16, 185, 129, 0.2)',
+                            color: '#34d399',
+                            borderRadius: 10,
                           }}
                         >
-                          <CheckCircle2 size={16} />
+                          <CheckCircle2 size={14} />
                           Approve
                         </button>
                         <button
                           disabled={isProcessing}
                           onClick={() => handleReject(req.id)}
+                          className="btn-secondary"
                           style={{
                             padding: '8px 14px',
-                            borderRadius: 8,
-                            border: '1px solid rgba(239, 68, 68, 0.4)',
-                            background: 'rgba(239, 68, 68, 0.15)',
-                            color: '#fca5a5',
-                            fontWeight: 600,
-                            fontSize: '0.85rem',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 6
+                            borderColor: 'rgba(239, 68, 68, 0.2)',
+                            color: '#f87171',
+                            borderRadius: 10,
                           }}
                         >
-                          <XCircle size={16} />
+                          <XCircle size={14} />
                           Reject
                         </button>
                       </div>

@@ -63,7 +63,7 @@ export default function Chat({ API_URL, token, batchName }) {
   return (
     <div style={styles.container}>
       {/* Groups Sidebar */}
-      <div className="glass-card" style={styles.sidebar}>
+      <div className="glass-card chat-sidebar" style={styles.sidebar}>
         <h3 style={styles.sidebarHeader}>My Groups</h3>
         <div style={styles.groupItemActive}>
           <Hash size={18} style={{ color: '#3b82f6' }} />
@@ -146,30 +146,31 @@ export default function Chat({ API_URL, token, batchName }) {
 const styles = {
   container: {
     display: 'flex',
-    gap: 20,
+    gap: 24,
     height: 'calc(100vh - 120px)',
     width: '100%',
+    position: 'relative',
+    zIndex: 2,
   },
   sidebar: {
-    width: 260,
     display: 'flex',
     flexDirection: 'column',
     gap: 16,
     padding: 20,
-    '@media (max-width: 768px)': {
-      display: 'none',
-    }
+    borderRadius: '20px',
   },
   sidebarHeader: {
     fontSize: 16,
+    fontFamily: 'var(--font-header)',
+    fontWeight: 700,
     color: '#ffffff',
     borderBottom: '1px solid rgba(255,255,255,0.06)',
     paddingBottom: 12,
   },
   groupItemActive: {
-    background: 'rgba(59,130,246,0.1)',
-    border: '1px solid rgba(59,130,246,0.2)',
-    borderRadius: 8,
+    background: 'rgba(59, 130, 246, 0.08)',
+    border: '1px solid rgba(59, 130, 246, 0.2)',
+    borderRadius: 10,
     padding: 12,
     display: 'flex',
     alignItems: 'center',
@@ -182,14 +183,15 @@ const styles = {
     flexDirection: 'column',
     padding: 0,
     overflow: 'hidden',
+    borderRadius: '20px',
   },
   chatHeader: {
     display: 'flex',
     alignItems: 'center',
     gap: 12,
-    padding: 16,
+    padding: 18,
     borderBottom: '1px solid rgba(255,255,255,0.06)',
-    background: 'rgba(255,255,255,0.01)',
+    background: 'rgba(3, 7, 18, 0.15)',
   },
   messageStream: {
     flex: 1,
@@ -197,7 +199,7 @@ const styles = {
     overflowY: 'auto',
     display: 'flex',
     flexDirection: 'column',
-    gap: 16,
+    gap: 18,
   },
   messageItem: {
     display: 'flex',
@@ -207,10 +209,10 @@ const styles = {
   messageContent: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 4,
-    background: 'rgba(0,0,0,0.15)',
-    padding: '10px 14px',
-    borderRadius: '0 12px 12px 12px',
+    gap: 6,
+    background: 'rgba(3, 7, 18, 0.35)',
+    padding: '12px 16px',
+    borderRadius: '0 14px 14px 14px',
     border: '1px solid rgba(255,255,255,0.04)',
     maxWidth: '80%',
   },
@@ -220,29 +222,31 @@ const styles = {
     gap: 8,
   },
   senderTitle: {
-    color: '#eab308',
+    color: '#fb923c',
     fontSize: 9,
-    fontWeight: 'bold',
+    fontWeight: '800',
     textTransform: 'uppercase',
-    background: 'rgba(234,179,8,0.1)',
-    padding: '1px 4px',
-    borderRadius: 3,
+    background: 'rgba(249, 115, 22, 0.08)',
+    padding: '2px 6px',
+    borderRadius: 4,
+    border: '1px solid rgba(249, 115, 22, 0.15)',
   },
   timestamp: {
     fontSize: 10,
-    color: '#9ca3af',
+    color: '#6b7280',
+    fontWeight: '500',
   },
   textBody: {
     fontSize: 13,
-    color: '#e5e7eb',
-    lineHeight: 1.4,
+    color: '#cbd5e1',
+    lineHeight: 1.5,
     whiteSpace: 'pre-wrap',
   },
   inputArea: {
     display: 'flex',
     padding: 16,
     borderTop: '1px solid rgba(255,255,255,0.06)',
-    background: 'rgba(0,0,0,0.1)',
+    background: 'rgba(3, 7, 18, 0.45)',
   },
   sendBtn: {
     borderRadius: '0 24px 24px 0',

@@ -7,6 +7,7 @@ class User(AbstractUser):
         ('student', 'Student'),
         ('admin', 'Admin'),
     ]
+    email = models.EmailField(unique=True, blank=False, null=False)
     role = models.CharField(max_length=15, choices=ROLE_CHOICES, default='student')
     roll_number = models.CharField(max_length=20, blank=True, null=True)
     phone_number = models.CharField(max_length=15, blank=True, null=True)
@@ -16,6 +17,9 @@ class User(AbstractUser):
     portfolio_url = models.URLField(blank=True, null=True)
     hackerrank_url = models.URLField(blank=True, null=True)
     last_seen = models.DateTimeField(blank=True, null=True, db_index=True, help_text="Timestamp of last API activity")
+
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['username']
 
 
 class Batch(models.Model):
@@ -235,3 +239,19 @@ class PlacementResource(models.Model):
 
     def __str__(self):
         return f"{self.placement_round.company.name} - {self.title}"
+
+
+class PasswordResetOTP(models.Model):
+    email = models.EmailField(db_index=True)
+    otp_hash = models.CharField(max_length=128)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    attempts = models.IntegerField(default=0)
+    is_verified = models.BooleanField(default=False)
+    is_used = models.BooleanField(default=False)
+
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+
+    def __str__(self):
+        return f"{self.email} - {self.expires_at}"

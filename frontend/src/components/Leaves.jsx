@@ -171,13 +171,17 @@ const styles = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 24,
+    gap: 32,
+    position: 'relative',
+    zIndex: 2,
   },
   header: {
     color: '#ffffff',
+    fontFamily: 'var(--font-header)',
     fontSize: 26,
+    fontWeight: 800,
     borderBottom: '1px solid rgba(255,255,255,0.06)',
-    paddingBottom: 20,
+    paddingBottom: 24,
   },
   mainLayout: {
     display: 'flex',
@@ -187,20 +191,24 @@ const styles = {
   leftCol: {
     flex: 2,
     minWidth: 320,
+    borderRadius: '20px',
   },
   rightCol: {
     flex: 3,
     minWidth: 320,
+    borderRadius: '20px',
   },
   sectionHeader: {
     fontSize: 18,
+    fontFamily: 'var(--font-header)',
+    fontWeight: 700,
     color: '#ffffff',
     marginBottom: 20,
   },
   form: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 16,
+    gap: 18,
   },
   inputWrapper: {
     display: 'flex',
@@ -209,8 +217,8 @@ const styles = {
   },
   label: {
     fontSize: 13,
-    color: '#d1d5db',
-    fontWeight: 'bold',
+    color: '#cbd5e1',
+    fontWeight: '500',
   },
   historyList: {
     display: 'flex',
@@ -220,13 +228,13 @@ const styles = {
     overflowY: 'auto',
   },
   historyItem: {
-    background: 'rgba(0,0,0,0.15)',
-    border: '1px solid rgba(255,255,255,0.05)',
-    borderRadius: 12,
-    padding: 16,
+    background: 'rgba(3, 7, 18, 0.25)',
+    border: '1px solid rgba(255, 255, 255, 0.04)',
+    borderRadius: 14,
+    padding: 18,
     display: 'flex',
     flexDirection: 'column',
-    gap: 10,
+    gap: 12,
   },
   itemHeader: {
     display: 'flex',
@@ -235,23 +243,26 @@ const styles = {
   },
   reasonText: {
     fontSize: 13,
-    color: '#d1d5db',
+    color: '#cbd5e1',
     fontStyle: 'italic',
+    lineHeight: 1.5,
   },
   pdfLink: {
     fontSize: 12,
-    color: '#3b82f6',
+    color: '#60a5fa',
     textDecoration: 'none',
     display: 'inline-flex',
     alignItems: 'center',
     gap: 4,
+    fontWeight: '600',
   },
   adminResp: {
-    background: 'rgba(255,255,255,0.04)',
-    padding: 10,
-    borderRadius: 6,
+    background: 'rgba(3, 7, 18, 0.45)',
+    padding: 12,
+    borderRadius: 8,
     fontSize: 12,
-    border: '1px solid rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255, 255, 255, 0.05)',
     color: '#9ca3af',
+    lineHeight: 1.5,
   }
 };

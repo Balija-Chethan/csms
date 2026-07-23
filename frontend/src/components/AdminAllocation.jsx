@@ -266,16 +266,16 @@ export default function AdminAllocation({ API_URL, token }) {
           <p style={{ color: '#9ca3af', marginTop: 8 }}>All registered students have active approved batches.</p>
         </div>
       ) : (
-        <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
-          <table style={styles.table}>
+        <div className="table-container" style={{ margin: 0 }}>
+          <table className="custom-table">
             <thead>
-              <tr style={styles.theadRow}>
-                <th style={styles.th}>Roll No</th>
-                <th style={styles.th}>Name</th>
-                <th style={styles.th}>Email</th>
-                <th style={styles.th}>Current Status</th>
-                <th style={styles.th}>Allocate to Batch</th>
-                <th style={styles.th}>Action</th>
+              <tr>
+                <th>Roll No</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Current Status</th>
+                <th>Allocate to Batch</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -283,18 +283,18 @@ export default function AdminAllocation({ API_URL, token }) {
                 const sId = student.student || student.id;
                 const defaultBId = data.batches.length > 0 ? data.batches[0].id : '';
                 return (
-                  <tr key={sId} style={styles.tr}>
-                    <td style={{ ...styles.td, fontWeight: 'bold' }}>{student.student_roll || 'N/A'}</td>
-                    <td style={styles.td}>{student.student_name}</td>
-                    <td style={styles.td}>{student.student_email}</td>
-                    <td style={styles.td}>
+                  <tr key={sId}>
+                    <td style={{ fontWeight: '700', color: '#ffffff' }}>{student.student_roll || 'N/A'}</td>
+                    <td>{student.student_name}</td>
+                    <td>{student.student_email}</td>
+                    <td>
                       {student.status === 'pending' ? (
                         <span className="badge badge-warning">Pending Request</span>
                       ) : (
-                        <span className="badge" style={{ background: 'rgba(255,255,255,0.05)', color: '#9ca3af' }}>Unassigned</span>
+                        <span className="badge" style={{ background: 'rgba(255,255,255,0.04)', color: '#9ca3af' }}>Unassigned</span>
                       )}
                     </td>
-                    <td style={styles.td}>
+                    <td>
                       <select 
                         className="custom-input" 
                         value={selectedBatch[sId] || defaultBId}
@@ -306,11 +306,11 @@ export default function AdminAllocation({ API_URL, token }) {
                         ))}
                       </select>
                     </td>
-                    <td style={styles.td}>
+                    <td>
                       <div style={{ display: 'flex', gap: 8 }}>
                         <button 
                           className="btn-primary" 
-                          style={{ padding: '8px 12px', fontSize: 13, background: '#10b981' }}
+                          style={{ padding: '8px 14px', fontSize: 13, background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', color: '#34d399' }}
                           onClick={() => handleAllocate(sId, selectedBatch[sId], 'approved')}
                           disabled={allocating[sId]}
                         >
@@ -319,7 +319,7 @@ export default function AdminAllocation({ API_URL, token }) {
 
                         <button 
                           className="btn-secondary" 
-                          style={{ padding: '8px 12px', fontSize: 13, borderColor: 'rgba(255,255,255,0.2)', color: '#9ca3af' }}
+                          style={{ padding: '8px 14px', fontSize: 13, borderColor: 'rgba(255,255,255,0.08)', color: '#cbd5e1' }}
                           onClick={() => handleRemoveStudentFromBatch(sId)}
                         >
                           <UserX size={14} /> Unassign
@@ -341,23 +341,29 @@ const styles = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 24,
+    gap: 32,
+    position: 'relative',
+    zIndex: 2,
   },
   header: {
     display: 'flex',
     alignItems: 'center',
     gap: 12,
     color: '#ffffff',
+    fontFamily: 'var(--font-header)',
+    fontSize: 26,
+    fontWeight: 800,
   },
   subheader: {
     fontSize: 14,
     color: '#9ca3af',
     borderBottom: '1px solid rgba(255,255,255,0.06)',
-    paddingBottom: 20,
+    paddingBottom: 24,
     marginTop: -8,
   },
   createCard: {
-    padding: 24,
+    padding: 28,
+    borderRadius: '20px',
   },
   formInline: {
     display: 'flex',
@@ -371,29 +377,5 @@ const styles = {
     gap: 6,
     flex: 1,
     minWidth: 200,
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    textAlign: 'left',
-  },
-  theadRow: {
-    borderBottom: '1px solid rgba(255,255,255,0.08)',
-    background: 'rgba(255,255,255,0.02)',
-  },
-  th: {
-    padding: '16px 20px',
-    color: '#9ca3af',
-    fontWeight: 'bold',
-    fontSize: 13,
-    textTransform: 'uppercase',
-  },
-  tr: {
-    borderBottom: '1px solid rgba(255,255,255,0.05)',
-  },
-  td: {
-    padding: '16px 20px',
-    fontSize: 14,
-    color: '#e5e7eb',
   }
 };

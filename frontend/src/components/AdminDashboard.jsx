@@ -92,14 +92,18 @@ const styles = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 24,
+    gap: 32,
+    position: 'relative',
+    zIndex: 2,
   },
   welcomeRow: {
     borderBottom: '1px solid rgba(255,255,255,0.06)',
-    paddingBottom: 20,
+    paddingBottom: 24,
   },
   header: {
     fontSize: 26,
+    fontFamily: 'var(--font-header)',
+    fontWeight: 800,
     color: '#ffffff',
     marginBottom: 6,
   },
@@ -110,17 +114,20 @@ const styles = {
   grid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
-    gap: 20,
+    gap: 24,
   },
   card: {
     display: 'flex',
     alignItems: 'center',
     gap: 20,
+    padding: 24,
+    borderRadius: '18px',
   },
   statVal: {
     fontSize: 28,
-    fontWeight: 'bold',
+    fontWeight: '800',
     color: '#ffffff',
+    fontFamily: 'var(--font-header)',
   },
   statLabel: {
     fontSize: 13,
@@ -129,7 +136,8 @@ const styles = {
   },
   infoBanner: {
     padding: 32,
-    color: '#d1d5db',
+    color: '#cbd5e1',
     lineHeight: 1.6,
+    borderRadius: '24px',
   }
 };

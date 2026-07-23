@@ -166,30 +166,37 @@ const styles = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 24,
+    gap: 32,
+    position: 'relative',
+    zIndex: 2,
   },
   header: {
     display: 'flex',
     alignItems: 'center',
     gap: 12,
     color: '#ffffff',
+    fontFamily: 'var(--font-header)',
+    fontSize: 26,
+    fontWeight: 800,
   },
   subheader: {
     fontSize: 14,
     color: '#9ca3af',
     borderBottom: '1px solid rgba(255,255,255,0.06)',
-    paddingBottom: 20,
+    paddingBottom: 24,
     marginTop: -8,
   },
   grid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
-    gap: 20,
+    gap: 24,
   },
   card: {
     display: 'flex',
     flexDirection: 'column',
     gap: 16,
+    padding: 24,
+    borderRadius: '20px',
   },
   cardHeader: {
     display: 'flex',
@@ -198,6 +205,8 @@ const styles = {
   },
   studentName: {
     fontSize: 18,
+    fontFamily: 'var(--font-header)',
+    fontWeight: 700,
     color: '#ffffff',
   },
   roll: {
@@ -207,9 +216,10 @@ const styles = {
     marginTop: 2,
   },
   bodyDetails: {
-    background: 'rgba(0,0,0,0.15)',
-    padding: 16,
-    borderRadius: 8,
+    background: 'rgba(3, 7, 18, 0.25)',
+    border: '1px solid rgba(255, 255, 255, 0.04)',
+    padding: 18,
+    borderRadius: 12,
     display: 'flex',
     flexDirection: 'column',
     gap: 10,
@@ -226,13 +236,13 @@ const styles = {
     fontSize: 13,
   },
   pdfLink: {
-    color: '#3b82f6',
+    color: '#60a5fa',
     textDecoration: 'none',
     fontSize: 12,
     display: 'inline-flex',
     alignItems: 'center',
     gap: 4,
-    fontWeight: 'bold',
+    fontWeight: '700',
     marginTop: 4,
   },
   actionBlock: {
@@ -249,19 +259,20 @@ const styles = {
   },
   label: {
     fontSize: 12,
-    color: '#d1d5db',
-    fontWeight: 'bold',
+    color: '#cbd5e1',
+    fontWeight: '500',
   },
   btnRow: {
     display: 'flex',
     gap: 10,
   },
   adminResp: {
-    background: 'rgba(255,255,255,0.04)',
+    background: 'rgba(3, 7, 18, 0.45)',
     border: '1px solid rgba(255,255,255,0.05)',
-    borderRadius: 6,
-    padding: 10,
+    borderRadius: 8,
+    padding: 12,
     fontSize: 13,
-    color: '#9ca3af',
+    color: '#cbd5e1',
+    lineHeight: 1.5,
   }
 };
