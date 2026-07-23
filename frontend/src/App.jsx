@@ -215,7 +215,7 @@ export default function App() {
         <div style={styles.headerLeft}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <img src="/logo.jpg" alt="CSMS Logo" style={{ height: 40, width: 'auto', borderRadius: 6, objectFit: 'contain' }} />
-            <div style={styles.logo}>CSMS <span style={styles.logoVersion}>3.0</span></div>
+            <div style={styles.logo}>CSMS</div>
           </div>
         </div>
 
@@ -639,15 +639,6 @@ const styles = {
     fontWeight: 900,
     letterSpacing: 1,
     color: '#ffffff',
-  },
-  logoVersion: {
-    color: '#3b82f6',
-    fontSize: 12,
-    fontWeight: 600,
-    background: 'rgba(59,130,246,0.1)',
-    padding: '2px 6px',
-    borderRadius: 4,
-    marginLeft: 4,
   },
   headerRight: {
     display: 'flex',
