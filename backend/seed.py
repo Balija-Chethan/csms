@@ -56,14 +56,14 @@ def seed_db():
 
     # 2. Create Admin Account
     admin = User.objects.create_superuser(
-        username="chethan@csms",
-        email="chethan@csms",
+        username="chethan@mits.ac.in",
+        email="chethan@mits.ac.in",
         password="Chethan@21",
         first_name="Chethan",
         last_name="",
         role='admin'
     )
-    print("Created Admin Account: chethan@csms")
+    print("Created Admin Account: chethan@mits.ac.in")
 
     # 3. Create Standard Available Training Batches
     batches_data = [
