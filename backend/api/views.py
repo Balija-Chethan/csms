@@ -368,18 +368,19 @@ def forgot_password(request):
     if not re.match(r'[^@]+@[^@]+\.[^@]+', email):
         return Response({'error': 'Invalid email format'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Validate domain
-    allowed_domains = getattr(settings, 'ALLOWED_EMAIL_DOMAINS', ['mits.ac.in'])
-    domain_match = any(email.endswith('@' + dom) or email.endswith('.' + dom) for dom in allowed_domains)
-    if not domain_match:
-        return Response({'error': 'Only official emails from allowed domains are accepted'}, status=status.HTTP_400_BAD_REQUEST)
-
     from api.mongo import restore_from_mongo
     restore_from_mongo()
 
     user = User.objects.filter(email__iexact=email).first()
     if not user:
         return Response({'error': 'No account exists with this email'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Validate domain (admins bypass this check)
+    if user.role != 'admin':
+        allowed_domains = getattr(settings, 'ALLOWED_EMAIL_DOMAINS', ['mits.ac.in'])
+        domain_match = any(email.endswith('@' + dom) or email.endswith('.' + dom) for dom in allowed_domains)
+        if not domain_match:
+            return Response({'error': 'Only official emails from allowed domains are accepted'}, status=status.HTTP_400_BAD_REQUEST)
 
     # Enforce 60s rate limit
     last_otp = PasswordResetOTP.objects.filter(email=email).order_by('-created_at').first()

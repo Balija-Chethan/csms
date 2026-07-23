@@ -56,15 +56,14 @@ export default function Login({ setAuth, API_URL }) {
 
     const endpoint = isRegister ? '/auth/register/' : '/auth/login/';
     
-    // Client-side domain check
     const trimmedEmail = email.trim().toLowerCase();
-    if (!trimmedEmail.endsWith('@mits.ac.in')) {
-      setError('Only official emails ending with @mits.ac.in are allowed.');
-      setLoading(false);
-      return;
-    }
 
     if (isRegister) {
+      if (!trimmedEmail.endsWith('@mits.ac.in')) {
+        setError('Only official emails ending with @mits.ac.in are allowed.');
+        setLoading(false);
+        return;
+      }
       if (password !== confirmPassword) {
         setError('Passwords do not match.');
         setLoading(false);
@@ -116,11 +115,6 @@ export default function Login({ setAuth, API_URL }) {
     setError('');
 
     const trimmedEmail = email.trim().toLowerCase();
-    if (!trimmedEmail.endsWith('@mits.ac.in')) {
-      setError('Only official emails ending with @mits.ac.in are allowed.');
-      setLoading(false);
-      return;
-    }
 
     try {
       const res = await fetch(`${API_URL}/auth/forgot-password/`, {
