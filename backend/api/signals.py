@@ -4,7 +4,8 @@ from api.models import (
     User, Batch, BatchEnrollment, Task, Submission,
     LeetcodeChallenge, LeetcodeSubmission, StudyNote,
     MockDriveResult, AttendanceLog, LeaveRequest, ChatMessage,
-    PlacementCompany, PlacementRound, PlacementResource, PasswordResetOTP
+    PlacementCompany, PlacementRound, PlacementResource, PasswordResetOTP,
+    Project, ProjectSubmission
 )
 from api.mongo import sync_to_mongo, delete_from_mongo
 
@@ -101,6 +102,15 @@ def sync_submission_to_mongo(sender, instance, **kwargs):
         'task_id': instance.task_id,
         'student_id': instance.student_id,
         'github_url': instance.github_url,
+        'submission_type': instance.submission_type,
+        'written_answer': instance.written_answer,
+        'uploaded_document': instance.uploaded_document.name if instance.uploaded_document else None,
+        'extracted_text': instance.extracted_text,
+        'quality_score': instance.quality_score,
+        'obtained_marks': instance.obtained_marks,
+        'evaluation_status': instance.evaluation_status,
+        'evaluation_time': str(instance.evaluation_time) if instance.evaluation_time else None,
+        'is_approved': instance.is_approved,
         'submitted_at': str(instance.submitted_at),
         'grade': instance.grade,
         'feedback': instance.feedback,
@@ -318,3 +328,56 @@ def sync_otp_to_mongo(sender, instance, **kwargs):
 @receiver(post_delete, sender=PasswordResetOTP)
 def delete_otp_from_mongo(sender, instance, **kwargs):
     delete_from_mongo('password_reset_otps', instance.id)
+
+
+# 17. Project
+@receiver(post_save, sender=Project)
+def sync_project_to_mongo(sender, instance, **kwargs):
+    data = {
+        'id': instance.id,
+        'title': instance.title,
+        'assigned_batch_id': instance.assigned_batch_id,
+        'assigned_batch_name': instance.assigned_batch.name if instance.assigned_batch else None,
+        'specification_file': instance.specification_file.name if instance.specification_file else None,
+        'specification_filename': instance.specification_filename,
+        'specification_extracted_text': instance.specification_extracted_text,
+        'additional_instructions': instance.additional_instructions,
+        'maximum_marks': instance.maximum_marks,
+        'start_date': str(instance.start_date),
+        'deadline': str(instance.deadline),
+        'created_at': str(instance.created_at) if instance.created_at else None,
+        'updated_at': str(instance.updated_at) if instance.updated_at else None
+    }
+    sync_to_mongo('projects', instance.id, data)
+
+@receiver(post_delete, sender=Project)
+def delete_project_from_mongo(sender, instance, **kwargs):
+    delete_from_mongo('projects', instance.id)
+
+
+# 18. ProjectSubmission
+@receiver(post_save, sender=ProjectSubmission)
+def sync_project_submission_to_mongo(sender, instance, **kwargs):
+    data = {
+        'id': instance.id,
+        'student_id': instance.student_id,
+        'student_name': instance.student.get_full_name() or instance.student.username,
+        'student_roll': instance.student.roll_number,
+        'project_id': instance.project_id,
+        'project_title': instance.project.title if instance.project else None,
+        'github_url': instance.github_url,
+        'deployment_url': instance.deployment_url,
+        'submitted_at': str(instance.submitted_at) if instance.submitted_at else None,
+        'project_match_score': instance.project_match_score,
+        'quality_score': instance.quality_score,
+        'obtained_marks': instance.obtained_marks,
+        'evaluation_report': instance.evaluation_report,
+        'status': instance.status,
+        'admin_feedback': instance.admin_feedback,
+        'graded_at': str(instance.graded_at) if instance.graded_at else None
+    }
+    sync_to_mongo('project_submissions', instance.id, data)
+
+@receiver(post_delete, sender=ProjectSubmission)
+def delete_project_submission_from_mongo(sender, instance, **kwargs):
+    delete_from_mongo('project_submissions', instance.id)

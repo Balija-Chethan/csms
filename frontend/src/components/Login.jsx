@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Mail, Lock, LogIn, ArrowRight, ShieldAlert, Key, ClipboardCheck } from 'lucide-react';
+import FloatingTechBackground from './FloatingTechBackground';
 
 export default function Login({ setAuth, API_URL }) {
   const [email, setEmail] = useState('');
@@ -216,6 +217,7 @@ export default function Login({ setAuth, API_URL }) {
         backgroundSize: 'cover',
         backgroundPosition: 'center'
       }}>
+        <FloatingTechBackground />
       </div>
 
       {/* Left Portion: Branding Header and Bottom Caption Info */}

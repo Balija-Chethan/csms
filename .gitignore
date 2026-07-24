@@ -23,3 +23,11 @@ dist-ssr/
 .DS_Store
 .vscode/
 .idea/
+
+# Environment configurations
+.env
+backend/.env
+frontend/.env
+**/ .env
+**/.env
+*.env

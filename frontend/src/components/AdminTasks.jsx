@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ClipboardList, PlusCircle, Calendar, Send, Code, Sparkles } from 'lucide-react';
+import { ClipboardList, PlusCircle, Calendar, Send, Code, Sparkles, FolderGit, FileText } from 'lucide-react';
 
 export default function AdminTasks({ API_URL, token }) {
   const [batches, setBatches] = useState([]);
@@ -13,6 +13,15 @@ export default function AdminTasks({ API_URL, token }) {
   const [dueDate, setDueDate] = useState('');
   const [selectedBatchId, setSelectedBatchId] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Project states
+  const [maximumMarks, setMaximumMarks] = useState('50');
+  const [additionalInstructions, setAdditionalInstructions] = useState('');
+  const [specificationFile, setSpecificationFile] = useState(null);
+  const [specificationFilename, setSpecificationFilename] = useState('');
+  const [specExtractedText, setSpecExtractedText] = useState('');
+  const [createdProject, setCreatedProject] = useState(null);
+  const [replacingFile, setReplacingFile] = useState(false);
 
   // 10-Day Bulk LeetCode states
   const todayStr = new Date().toISOString().split('T')[0];
@@ -62,6 +71,54 @@ export default function AdminTasks({ API_URL, token }) {
       { dayNumber: 10, title: '242. Valid Anagram', url: 'https://leetcode.com/problems/valid-anagram/' },
     ];
     setBulkItems(samples);
+  };
+
+  const handleRemoveSpec = async () => {
+    if (!createdProject) return;
+    if (!window.confirm("Are you sure you want to remove the specification file? This will delete the extracted requirements text as well.")) return;
+    
+    try {
+      const res = await fetch(`${API_URL}/admin/project/${createdProject.id}/?removeSpecOnly=true`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      
+      alert(data.status || 'File removed successfully!');
+      setCreatedProject(data.project);
+      setReplacingFile(false);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleReplaceSpecSubmit = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !createdProject) return;
+    
+    const formData = new FormData();
+    formData.append('specification', file);
+    
+    try {
+      const res = await fetch(`${API_URL}/admin/project/${createdProject.id}/`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      
+      alert('Specification file replaced successfully!');
+      setCreatedProject(data);
+      setReplacingFile(false);
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -144,6 +201,42 @@ export default function AdminTasks({ API_URL, token }) {
       } finally {
         setSubmitting(false);
       }
+    } else if (taskType === 'projects') {
+      if (!title || !selectedBatchId || !specificationFile || !dueDate) {
+        return alert('Missing required project fields or specification file');
+      }
+      setSubmitting(true);
+      try {
+        const formData = new FormData();
+        formData.append('title', title);
+        formData.append('batchId', selectedBatchId);
+        formData.append('maximumMarks', maximumMarks);
+        formData.append('startDate', startDate || todayStr);
+        formData.append('deadline', dueDate);
+        formData.append('additionalInstructions', additionalInstructions);
+        formData.append('specification', specificationFile);
+
+        const res = await fetch(`${API_URL}/admin/create-project/`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formData
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        alert('Project created and assigned successfully!');
+        setTitle('');
+        setAdditionalInstructions('');
+        setSpecificationFile(null);
+        setSpecificationFilename('');
+        setCreatedProject(data);
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        setSubmitting(false);
+      }
     }
   };
 
@@ -162,11 +255,13 @@ export default function AdminTasks({ API_URL, token }) {
               <PlusCircle size={18} style={{ color: '#3b82f6' }} />
             ) : taskType === 'leetcode' ? (
               <Code size={18} style={{ color: '#eab308' }} />
-            ) : (
+            ) : taskType === 'bulk_leetcode' ? (
               <Sparkles size={18} style={{ color: '#a855f7' }} />
+            ) : (
+              <FolderGit size={18} style={{ color: '#60a5fa' }} />
             )}
             <span>
-              {taskType === 'regular' ? 'Assign Worksheet Task' : taskType === 'leetcode' ? 'Single LeetCode Challenge' : '10-Day LeetCode Bulk Scheduler'}
+              {taskType === 'regular' ? 'Assign Worksheet Task' : taskType === 'leetcode' ? 'Single LeetCode Challenge' : taskType === 'bulk_leetcode' ? '10-Day LeetCode Bulk Scheduler' : 'Create Assigned Project'}
             </span>
           </h3>
 
@@ -192,6 +287,13 @@ export default function AdminTasks({ API_URL, token }) {
               onClick={() => setTaskType('bulk_leetcode')}
             >
               ✨ 10-Day Schedule Bulk
+            </button>
+            <button 
+              type="button"
+              style={taskType === 'projects' ? styles.toggleBtnActive : styles.toggleBtn}
+              onClick={() => setTaskType('projects')}
+            >
+              Projects
             </button>
           </div>
 
@@ -343,12 +445,191 @@ export default function AdminTasks({ API_URL, token }) {
               </>
             )}
 
-            <button type="submit" className="btn-primary" disabled={submitting} style={{ justifyContent: 'center', marginTop: 16, padding: '12px 20px' }}>
+            {taskType === 'projects' && (
+              <>
+                {!createdProject ? (
+                  <>
+                    <div style={styles.inputWrapper}>
+                      <label style={styles.label}>Select Target Batch</label>
+                      <select 
+                        className="custom-input" 
+                        value={selectedBatchId} 
+                        onChange={e => setSelectedBatchId(e.target.value)}
+                        required
+                      >
+                        {batches.map(b => (
+                          <option key={b.id} value={b.id}>{b.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div style={styles.inputWrapper}>
+                      <label style={styles.label}>Project Title</label>
+                      <input 
+                        type="text" 
+                        className="custom-input" 
+                        placeholder="e.g. Student Management System"
+                        value={title} 
+                        onChange={e => setTitle(e.target.value)} 
+                        required 
+                      />
+                    </div>
+
+                    <div style={styles.inputWrapper}>
+                      <label style={styles.label}>Upload Project Specification (PDF, DOCX, TXT)</label>
+                      <input 
+                        type="file" 
+                        className="custom-input" 
+                        accept=".pdf,.docx,.txt"
+                        onChange={e => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            setSpecificationFile(file);
+                            setSpecificationFilename(file.name);
+                          }
+                        }}
+                        required 
+                      />
+                    </div>
+
+                    <div style={styles.inputWrapper}>
+                      <label style={styles.label}>Maximum Marks</label>
+                      <input 
+                        type="number" 
+                        className="custom-input" 
+                        placeholder="e.g. 50"
+                        value={maximumMarks} 
+                        onChange={e => setMaximumMarks(e.target.value)} 
+                        required 
+                      />
+                    </div>
+
+                    <div style={styles.inputWrapper}>
+                      <label style={styles.label}>Start Date</label>
+                      <input 
+                        type="date" 
+                        className="custom-input" 
+                        value={startDate} 
+                        onChange={e => setStartDate(e.target.value)} 
+                        required 
+                      />
+                    </div>
+
+                    <div style={styles.inputWrapper}>
+                      <label style={styles.label}>Deadline / Due Date</label>
+                      <input 
+                        type="date" 
+                        className="custom-input" 
+                        value={dueDate} 
+                        onChange={e => setDueDate(e.target.value)} 
+                        required 
+                      />
+                    </div>
+
+                    <div style={styles.inputWrapper}>
+                      <label style={styles.label}>Additional Instructions (Optional)</label>
+                      <textarea 
+                        className="custom-input" 
+                        placeholder="Describe any tech stack details or submission notes..."
+                        value={additionalInstructions} 
+                        onChange={e => setAdditionalInstructions(e.target.value)} 
+                        style={{ minHeight: 80, resize: 'vertical' }}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <div style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid #10b981', padding: 16, borderRadius: 12, color: '#e5e7eb' }}>
+                      <h4 style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: 6, fontWeight: '700', marginBottom: 6 }}>
+                        Project Specification Uploaded ✓
+                      </h4>
+                      <p style={{ fontSize: 13 }}><strong>Project:</strong> {createdProject.title}</p>
+                      <p style={{ fontSize: 13, marginTop: 4 }}><strong>File:</strong> {createdProject.specification_filename || 'Uploaded File'}</p>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 12 }}>
+                      <a 
+                        href={createdProject.specification_file ? `${API_URL.replace('/api', '')}${createdProject.specification_file}` : '#'} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="btn-secondary"
+                        style={{ flex: 1, textDecoration: 'none', textAlign: 'center', justifyContent: 'center', display: 'flex', alignItems: 'center' }}
+                      >
+                        View File
+                      </a>
+                      <button 
+                        type="button" 
+                        className="btn-secondary" 
+                        onClick={() => setReplacingFile(!replacingFile)}
+                        style={{ flex: 1, justifyContent: 'center' }}
+                      >
+                        Replace File
+                      </button>
+                      <button 
+                        type="button" 
+                        className="btn-secondary" 
+                        onClick={handleRemoveSpec}
+                        style={{ flex: 1, justifyContent: 'center', color: '#ef4444' }}
+                      >
+                        Remove File
+                      </button>
+                    </div>
+
+                    {replacingFile && (
+                      <div style={{ background: 'rgba(0,0,0,0.15)', padding: 12, borderRadius: 8, border: '1px dashed rgba(255,255,255,0.1)' }}>
+                        <label style={styles.label}>Select Replacement File</label>
+                        <input 
+                          type="file" 
+                          className="custom-input" 
+                          accept=".pdf,.docx,.txt"
+                          onChange={handleReplaceSpecSubmit}
+                          style={{ marginTop: 6 }}
+                        />
+                      </div>
+                    )}
+
+                    {createdProject.specification_extracted_text && (
+                      <div>
+                        <label style={styles.label}>Extracted Specification Preview</label>
+                        <div style={{ 
+                          marginTop: 6, 
+                          background: 'rgba(0,0,0,0.3)', 
+                          padding: 12, 
+                          borderRadius: 8, 
+                          maxHeight: 250, 
+                          overflowY: 'auto', 
+                          fontSize: 12, 
+                          fontFamily: 'monospace', 
+                          lineHeight: 1.5,
+                          whiteSpace: 'pre-wrap',
+                          color: '#9ca3af',
+                          border: '1px solid rgba(255,255,255,0.06)'
+                        }}>
+                          {createdProject.specification_extracted_text}
+                        </div>
+                      </div>
+                    )}
+
+                    <button 
+                      type="button" 
+                      className="btn-secondary" 
+                      onClick={() => setCreatedProject(null)}
+                      style={{ marginTop: 12, width: '100%', justifyContent: 'center' }}
+                    >
+                      ← Create Another Project
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+
+            <button type="submit" className="btn-primary" disabled={submitting || (taskType === 'projects' && createdProject)} style={{ justifyContent: 'center', marginTop: 16, padding: '12px 20px' }}>
               <Send size={16} /> 
               {submitting ? 'Processing...' : (
                 taskType === 'regular' ? 'Assign Task to Batch' : 
                 taskType === 'leetcode' ? 'Assign Single Challenge' : 
-                'Schedule 10-Day LeetCode Release'
+                taskType === 'bulk_leetcode' ? 'Schedule 10-Day LeetCode Release' :
+                'Create Project'
               )}
             </button>
           </form>

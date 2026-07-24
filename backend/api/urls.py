@@ -61,6 +61,14 @@ urlpatterns = [
     path('admin/approve/<int:enrollment_id>/', views.admin_approve_batch_request, name='admin_approve_request'),
     path('admin/reject/<int:enrollment_id>/', views.admin_reject_batch_request, name='admin_reject_request'),
     path('admin/change-password/', views.admin_change_password, name='admin_change_password'),
+    
+    # Projects Endpoints
+    path('admin/create-project/', views.admin_create_project, name='admin_create_project'),
+    path('admin/projects/', views.admin_get_projects, name='admin_get_projects'),
+    path('admin/project/<int:project_id>/', views.admin_manage_project, name='admin_manage_project'),
+    path('admin/project-submissions/', views.admin_get_project_submissions, name='admin_get_project_submissions'),
+    path('admin/grade-project-submission/', views.admin_grade_project_submission, name='admin_grade_project_submission'),
+    path('student/projects/', views.student_projects, name='student_projects'),
 ]
 
 

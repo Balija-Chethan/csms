@@ -28,6 +28,9 @@ def create_mongo_indexes(db):
         db['chat_messages'].create_index([('batch_id', 1)])
         db['chat_messages'].create_index([('timestamp', 1)])
         db['password_reset_otps'].create_index([('email', 1)])
+        db['projects'].create_index([('assigned_batch_id', 1)])
+        db['project_submissions'].create_index([('student_id', 1)])
+        db['project_submissions'].create_index([('project_id', 1)])
         print("[MongoDB] Indexes verified/created successfully.")
     except Exception as e:
         print(f"[MongoDB Error] Failed to create indexes: {e}")
@@ -133,7 +136,8 @@ def restore_from_mongo(force=False):
             User, Batch, BatchEnrollment, Task, Submission,
             LeetcodeChallenge, LeetcodeSubmission, StudyNote,
             MockDriveResult, AttendanceLog, LeaveRequest, ChatMessage,
-            PlacementCompany, PlacementRound, PlacementResource, PasswordResetOTP
+            PlacementCompany, PlacementRound, PlacementResource, PasswordResetOTP,
+            Project, ProjectSubmission
         )
         from datetime import datetime, date, timedelta
         from django.utils import timezone
@@ -418,18 +422,38 @@ def restore_from_mongo(force=False):
                             sub = Submission(
                                 task=task,
                                 student=student,
-                                github_url=s.get('github_url', ''),
+                                github_url=s.get('github_url'),
+                                submission_type=s.get('submission_type', 'written'),
+                                written_answer=s.get('written_answer'),
+                                extracted_text=s.get('extracted_text'),
+                                quality_score=s.get('quality_score'),
+                                obtained_marks=s.get('obtained_marks'),
+                                evaluation_status=s.get('evaluation_status', 'pending'),
+                                evaluation_time=parse_datetime(s.get('evaluation_time')),
+                                is_approved=s.get('is_approved', False),
                                 grade=s.get('grade'),
                                 feedback=s.get('feedback'),
                                 graded_at=parse_datetime(s.get('graded_at'))
                             )
+                            if s.get('uploaded_document'):
+                                sub.uploaded_document = s.get('uploaded_document')
                             if str(raw_id).isdigit():
                                 sub.id = int(raw_id)
                         else:
                             sub.github_url = s.get('github_url', sub.github_url)
+                            sub.submission_type = s.get('submission_type', sub.submission_type)
+                            sub.written_answer = s.get('written_answer', sub.written_answer)
+                            sub.extracted_text = s.get('extracted_text', sub.extracted_text)
+                            sub.quality_score = s.get('quality_score', sub.quality_score)
+                            sub.obtained_marks = s.get('obtained_marks', sub.obtained_marks)
+                            sub.evaluation_status = s.get('evaluation_status', sub.evaluation_status)
+                            sub.evaluation_time = parse_datetime(s.get('evaluation_time')) or sub.evaluation_time
+                            sub.is_approved = s.get('is_approved', sub.is_approved)
                             sub.grade = s.get('grade', sub.grade)
                             sub.feedback = s.get('feedback', sub.feedback)
                             sub.graded_at = parse_datetime(s.get('graded_at')) or sub.graded_at
+                            if s.get('uploaded_document'):
+                                sub.uploaded_document = s.get('uploaded_document')
                         sub.save()
                         sub_time = parse_datetime(s.get('submitted_at'))
                         if sub_time:
@@ -628,6 +652,101 @@ def restore_from_mongo(force=False):
                                 PasswordResetOTP.objects.filter(id=otp_record.id).update(created_at=created_time)
                     except Exception:
                         pass
+        except Exception:
+            pass
+
+        # 15. Restore Projects
+        try:
+            mongo_projects = list(db['projects'].find({}))
+            for p in mongo_projects:
+                raw_id = p.get('_id') or p.get('id')
+                batch_id = p.get('assigned_batch_id')
+                title = p.get('title')
+                if batch_id and title:
+                    try:
+                        batch = Batch.objects.filter(id=batch_id).first()
+                        if batch:
+                            proj = Project.objects.filter(id=int(raw_id)).first() if str(raw_id).isdigit() else Project.objects.filter(assigned_batch=batch, title=title).first()
+                            if not proj:
+                                proj = Project(
+                                    title=title,
+                                    assigned_batch=batch,
+                                    specification_filename=p.get('specification_filename'),
+                                    specification_extracted_text=p.get('specification_extracted_text'),
+                                    additional_instructions=p.get('additional_instructions'),
+                                    maximum_marks=p.get('maximum_marks', 100),
+                                    start_date=parse_date(p.get('start_date')) or date.today(),
+                                    deadline=parse_date(p.get('deadline')) or date.today()
+                                )
+                                if p.get('specification_file'):
+                                    proj.specification_file = p.get('specification_file')
+                                if str(raw_id).isdigit():
+                                    proj.id = int(raw_id)
+                            else:
+                                proj.title = title
+                                proj.assigned_batch = batch
+                                proj.specification_filename = p.get('specification_filename', proj.specification_filename)
+                                proj.specification_extracted_text = p.get('specification_extracted_text', proj.specification_extracted_text)
+                                proj.additional_instructions = p.get('additional_instructions', proj.additional_instructions)
+                                proj.maximum_marks = p.get('maximum_marks', proj.maximum_marks)
+                                proj.start_date = parse_date(p.get('start_date')) or proj.start_date
+                                proj.deadline = parse_date(p.get('deadline')) or proj.deadline
+                                if p.get('specification_file'):
+                                    proj.specification_file = p.get('specification_file')
+                            proj.save()
+                            created_time = parse_datetime(p.get('created_at'))
+                            if created_time:
+                                Project.objects.filter(id=proj.id).update(created_at=created_time)
+                    except Exception as e:
+                        print(f"[MongoDB Auto-Restore] Error restoring project: {e}")
+        except Exception:
+            pass
+
+        # 16. Restore ProjectSubmissions
+        try:
+            mongo_p_submissions = list(db['project_submissions'].find({}))
+            for ps in mongo_p_submissions:
+                raw_id = ps.get('_id') or ps.get('id')
+                student_id = ps.get('student_id')
+                project_id = ps.get('project_id')
+                if student_id and project_id:
+                    try:
+                        student = User.objects.filter(id=student_id).first()
+                        project = Project.objects.filter(id=project_id).first()
+                        if student and project:
+                            sub = ProjectSubmission.objects.filter(project=project, student=student).first()
+                            if not sub:
+                                sub = ProjectSubmission(
+                                    student=student,
+                                    project=project,
+                                    github_url=ps.get('github_url', ''),
+                                    deployment_url=ps.get('deployment_url'),
+                                    project_match_score=ps.get('project_match_score'),
+                                    quality_score=ps.get('quality_score'),
+                                    obtained_marks=ps.get('obtained_marks'),
+                                    evaluation_report=ps.get('evaluation_report'),
+                                    status=ps.get('status', 'pending'),
+                                    admin_feedback=ps.get('admin_feedback'),
+                                    graded_at=parse_datetime(ps.get('graded_at'))
+                                )
+                                if str(raw_id).isdigit():
+                                    sub.id = int(raw_id)
+                            else:
+                                sub.github_url = ps.get('github_url', sub.github_url)
+                                sub.deployment_url = ps.get('deployment_url', sub.deployment_url)
+                                sub.project_match_score = ps.get('project_match_score', sub.project_match_score)
+                                sub.quality_score = ps.get('quality_score', sub.quality_score)
+                                sub.obtained_marks = ps.get('obtained_marks', sub.obtained_marks)
+                                sub.evaluation_report = ps.get('evaluation_report', sub.evaluation_report)
+                                sub.status = ps.get('status', sub.status)
+                                sub.admin_feedback = ps.get('admin_feedback', sub.admin_feedback)
+                                sub.graded_at = parse_datetime(ps.get('graded_at')) or sub.graded_at
+                            sub.save()
+                            sub_time = parse_datetime(ps.get('submitted_at'))
+                            if sub_time:
+                                ProjectSubmission.objects.filter(id=sub.id).update(submitted_at=sub_time)
+                    except Exception as e:
+                        print(f"[MongoDB Auto-Restore] Error restoring project submission: {e}")
         except Exception:
             pass
 

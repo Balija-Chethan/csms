@@ -2,13 +2,16 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { 
   LayoutDashboard, BookOpen, BarChart3, Users, 
   Settings, LogOut, ChevronDown, ChevronRight, ClipboardList, Clock, ShieldAlert, Award, Menu,
-  Key, FileText, User, Code2, Trophy, Calendar, GraduationCap
+  Key, FileText, User, Code2, Trophy, Calendar, GraduationCap, FolderGit
 } from 'lucide-react';
+
+import FloatingTechBackground from './components/FloatingTechBackground';
 
 const Login = lazy(() => import('./components/Login'));
 const Dashboard = lazy(() => import('./components/Dashboard'));
 const Tasks = lazy(() => import('./components/Tasks'));
 const LeetCode = lazy(() => import('./components/LeetCode'));
+const Projects = lazy(() => import('./components/Projects'));
 const Notes = lazy(() => import('./components/Notes'));
 const Grades = lazy(() => import('./components/Grades'));
 const Leaderboard = lazy(() => import('./components/Leaderboard'));
@@ -206,6 +209,7 @@ export default function App() {
     <div className="theme-default" style={styles.appContainer}>
       {/* Decorative animated cosmic background blobs & visual effects */}
       <div className="cosmic-bg">
+        <FloatingTechBackground />
         <div className="aurora-wave"></div>
         <div className="blob blob-1"></div>
         <div className="blob blob-2"></div>
@@ -433,6 +437,13 @@ export default function App() {
                             <ClipboardList size={20} />
                             My Tasks
                           </button>
+                           <button 
+                             className={activeTab === 'projects' ? "nav-btn-active" : "nav-btn"}
+                             onClick={() => { setActiveTab('projects'); setSidebarOpen(false); }}
+                           >
+                             <FolderGit size={20} />
+                             My Projects
+                           </button>
                           <button 
                             className={activeTab === 'leetcode' ? "nav-btn-active" : "nav-btn"}
                             onClick={() => { setActiveTab('leetcode'); setSidebarOpen(false); }}
@@ -611,6 +622,7 @@ export default function App() {
                       )}
                       {activeTab === 'tasks' && <Tasks API_URL={API_URL} token={token} />}
                       {activeTab === 'leetcode' && <LeetCode API_URL={API_URL} token={token} />}
+                      {activeTab === 'projects' && <Projects API_URL={API_URL} token={token} />}
                       {activeTab === 'notes' && <Notes API_URL={API_URL} token={token} />}
                       {activeTab === 'placement_prep' && <PlacementPrep API_URL={API_URL} token={token} />}
                       {activeTab === 'grades' && <Grades API_URL={API_URL} token={token} />}

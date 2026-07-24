@@ -3,7 +3,8 @@ from api.models import (
     User, Batch, BatchEnrollment, Task, Submission, 
     LeetcodeChallenge, LeetcodeSubmission, StudyNote, 
     MockDriveResult, AttendanceLog, LeaveRequest, ChatMessage,
-    PlacementCompany, PlacementRound, PlacementResource
+    PlacementCompany, PlacementRound, PlacementResource,
+    Project, ProjectSubmission
 )
 
 class UserSerializer(serializers.ModelSerializer):
@@ -57,6 +58,29 @@ class SubmissionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Submission
+        fields = '__all__'
+
+    def get_student_name(self, obj):
+        full = obj.student.get_full_name()
+        return full.strip() if full and full.strip() else obj.student.username
+
+
+class ProjectSerializer(serializers.ModelSerializer):
+    batch_name = serializers.CharField(source='assigned_batch.name', read_only=True)
+
+    class Meta:
+        model = Project
+        fields = '__all__'
+
+
+class ProjectSubmissionSerializer(serializers.ModelSerializer):
+    student_name = serializers.SerializerMethodField()
+    student_roll = serializers.CharField(source='student.roll_number', read_only=True)
+    project_title = serializers.CharField(source='project.title', read_only=True)
+    project_max_marks = serializers.IntegerField(source='project.maximum_marks', read_only=True)
+
+    class Meta:
+        model = ProjectSubmission
         fields = '__all__'
 
     def get_student_name(self, obj):

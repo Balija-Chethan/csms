@@ -7,6 +7,11 @@ export default function Tasks({ API_URL, token }) {
   const [submitUrl, setSubmitUrl] = useState({});
   const [submitting, setSubmitting] = useState({});
 
+  // Submission types/answers state
+  const [submissionType, setSubmissionType] = useState({}); // taskId -> 'written' | 'document'
+  const [writtenAnswer, setWrittenAnswer] = useState({}); // taskId -> text
+  const [uploadedDocument, setUploadedDocument] = useState({}); // taskId -> file
+
   const fetchTasks = async () => {
     try {
       const res = await fetch(`${API_URL}/student/tasks/?_cb=${Date.now()}`, {
@@ -46,18 +51,29 @@ export default function Tasks({ API_URL, token }) {
   }, [tasks]);
 
   const handleSubmit = async (taskId) => {
-    const url = submitUrl[taskId];
-    if (!url) return alert('Please enter a GitHub URL');
+    const type = submissionType[taskId] || 'written';
+    const form = new FormData();
+    form.append('taskId', taskId);
+    form.append('submissionType', type);
+
+    if (type === 'written') {
+      const answer = writtenAnswer[taskId];
+      if (!answer || !answer.trim()) return alert('Please enter your written answer');
+      form.append('writtenAnswer', answer);
+    } else {
+      const file = uploadedDocument[taskId];
+      if (!file) return alert('Please select a document file (PDF, DOCX, TXT)');
+      form.append('uploadedDocument', file);
+    }
 
     setSubmitting(prev => ({ ...prev, [taskId]: true }));
     try {
       const res = await fetch(`${API_URL}/student/tasks/`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ taskId, githubUrl: url })
+        body: form
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -125,9 +141,37 @@ export default function Tasks({ API_URL, token }) {
                 )}
 
                 <div style={styles.subLinkRow}>
-                  <a href={task.submission.github_url} target="_blank" rel="noopener noreferrer" style={styles.extLink}>
-                    View Submitted Work <ExternalLink size={14} />
-                  </a>
+                  {(!task.submission.submission_type || task.submission.submission_type === 'github') && task.submission.github_url && (
+                    <a href={task.submission.github_url} target="_blank" rel="noopener noreferrer" style={styles.extLink}>
+                      View Submitted GitHub Code <ExternalLink size={14} />
+                    </a>
+                  )}
+                  {task.submission.submission_type === 'written' && (
+                    <div style={{ fontSize: 13, width: '100%', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 10 }}>
+                      <strong>Your Answer:</strong>
+                      <div style={{ maxHeight: 100, overflowY: 'auto', background: 'rgba(0,0,0,0.2)', padding: 8, borderRadius: 6, marginTop: 4, whiteSpace: 'pre-wrap', fontStyle: 'italic', color: '#cbd5e1' }}>
+                        {task.submission.written_answer}
+                      </div>
+                    </div>
+                  )}
+                  {task.submission.submission_type === 'document' && (
+                    <div style={{ fontSize: 13, width: '100%', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 10 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                        <strong>Submitted Document:</strong>
+                        <a href={API_URL.replace('/api', '') + task.submission.uploaded_document} target="_blank" rel="noopener noreferrer" style={styles.extLink}>
+                          View Document <ExternalLink size={12} />
+                        </a>
+                      </div>
+                      {task.submission.extracted_text && (
+                        <div>
+                          <strong style={{ fontSize: 11, color: '#9ca3af' }}>Extracted Text Preview:</strong>
+                          <div style={{ maxHeight: 100, overflowY: 'auto', background: 'rgba(0,0,0,0.2)', padding: 8, borderRadius: 6, marginTop: 4, whiteSpace: 'pre-wrap', fontStyle: 'italic', fontSize: 12, color: '#cbd5e1' }}>
+                            {task.submission.extracted_text}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 {task.submission.feedback && (
                   <div style={styles.feedbackBox}>
@@ -140,14 +184,66 @@ export default function Tasks({ API_URL, token }) {
               </div>
             ) : (
               <div style={styles.submitSection}>
-                <input 
-                  type="url" 
-                  className="custom-input" 
-                  placeholder="https://github.com/yourusername/repo"
-                  value={submitUrl[task.id] || ''}
-                  onChange={e => setSubmitUrl(prev => ({ ...prev, [task.id]: e.target.value }))}
-                  style={{ marginBottom: 12 }}
-                />
+                <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+                  <button
+                    type="button"
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      border: '1px solid rgba(255,255,255,0.06)',
+                      background: (submissionType[task.id] || 'written') === 'written' ? 'rgba(59,130,246,0.1)' : 'none',
+                      color: (submissionType[task.id] || 'written') === 'written' ? '#3b82f6' : '#9ca3af',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      fontWeight: '600'
+                    }}
+                    onClick={() => setSubmissionType(prev => ({ ...prev, [task.id]: 'written' }))}
+                  >
+                    Written Answer
+                  </button>
+                  <button
+                    type="button"
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      border: '1px solid rgba(255,255,255,0.06)',
+                      background: submissionType[task.id] === 'document' ? 'rgba(59,130,246,0.1)' : 'none',
+                      color: submissionType[task.id] === 'document' ? '#3b82f6' : '#9ca3af',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      fontWeight: '600'
+                    }}
+                    onClick={() => setSubmissionType(prev => ({ ...prev, [task.id]: 'document' }))}
+                  >
+                    Document Upload
+                  </button>
+                </div>
+
+                {(submissionType[task.id] || 'written') === 'written' ? (
+                  <textarea
+                    className="custom-input"
+                    placeholder="Type your complete answer/report here..."
+                    value={writtenAnswer[task.id] || ''}
+                    onChange={e => setWrittenAnswer(prev => ({ ...prev, [task.id]: e.target.value }))}
+                    style={{ marginBottom: 12, minHeight: 80, resize: 'vertical' }}
+                  />
+                ) : (
+                  <input
+                    type="file"
+                    className="custom-input"
+                    accept=".pdf,.docx,.txt"
+                    onChange={e => {
+                      const file = e.target.files[0];
+                      if (file) {
+                        setUploadedDocument(prev => ({ ...prev, [task.id]: file }));
+                      }
+                    }}
+                    style={{ marginBottom: 12 }}
+                  />
+                )}
+
                 <button 
                   className="btn-primary" 
                   onClick={() => handleSubmit(task.id)}

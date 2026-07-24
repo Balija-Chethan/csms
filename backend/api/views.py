@@ -11,14 +11,16 @@ from api.models import (
     User, Batch, BatchEnrollment, Task, Submission, 
     LeetcodeChallenge, LeetcodeSubmission, StudyNote, 
     MockDriveResult, AttendanceLog, LeaveRequest, ChatMessage,
-    PlacementCompany, PlacementRound, PlacementResource
+    PlacementCompany, PlacementRound, PlacementResource,
+    Project, ProjectSubmission
 )
 from api.serializers import (
     UserSerializer, BatchSerializer, BatchEnrollmentSerializer,
     TaskSerializer, SubmissionSerializer, StudyNoteSerializer, 
     MockDriveResultSerializer, AttendanceLogSerializer,
     LeaveRequestSerializer, ChatMessageSerializer,
-    PlacementCompanySerializer, LeetcodeSubmissionSerializer
+    PlacementCompanySerializer, LeetcodeSubmissionSerializer,
+    ProjectSerializer, ProjectSubmissionSerializer
 )
 from api.auth_utils import JWTAuthentication, generate_token
 
@@ -69,8 +71,173 @@ import threading
 import time
 import random
 
-def evaluate_submission(sub):
-    # Calculate quality score component by component:
+def extract_text_from_file(file_path, filename):
+    import os
+    _, ext = os.path.splitext(filename.lower())
+    
+    size = os.path.getsize(file_path)
+    if size == 0:
+        raise ValueError("The uploaded file is empty.")
+    if size > 10 * 1024 * 1024:
+        raise ValueError("The uploaded file exceeds the 10MB size limit.")
+        
+    extracted_text = ""
+    
+    if ext == '.txt':
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                extracted_text = f.read()
+        except Exception as e:
+            raise ValueError(f"Could not read text file: {e}")
+            
+    elif ext == '.pdf':
+        try:
+            import pypdf
+            reader = pypdf.PdfReader(file_path)
+            if len(reader.pages) == 0:
+                raise ValueError("PDF file contains no pages.")
+            for page in reader.pages:
+                text = page.extract_text()
+                if text:
+                    extracted_text += text + "\n"
+        except Exception as e:
+            raise ValueError(f"Could not parse PDF document: {e}")
+            
+    elif ext == '.docx':
+        try:
+            import docx
+            doc = docx.Document(file_path)
+            for para in doc.paragraphs:
+                extracted_text += para.text + "\n"
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        extracted_text += cell.text + " "
+                    extracted_text += "\n"
+        except Exception as e:
+            raise ValueError(f"Could not parse Word document: {e}")
+    else:
+        raise ValueError("Unsupported file format. Please upload PDF, DOCX, or TXT.")
+        
+    if not extracted_text.strip():
+        raise ValueError("No readable text could be extracted from the document.")
+        
+    return extracted_text.strip()
+
+
+def grade_content_with_llm(task_title, task_description, grading_criteria, expected_answer, student_answer, max_marks):
+    import os
+    import urllib.request
+    import json
+    import re
+
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    if not gemini_key:
+        from django.conf import settings
+        gemini_key = getattr(settings, 'GEMINI_API_KEY', None)
+
+    prompt = f"""You are an expert academic evaluator. Your job is to grade the student's submission.
+
+Task Title: {task_title}
+Task Instructions / Description: {task_description}
+Grading Criteria / Rubric: {grading_criteria or "General understanding, accuracy and completeness"}
+Expected Answer (if provided): {expected_answer or "N/A"}
+Max Marks: {max_marks}
+
+Student Submission Answer Text:
+---
+{student_answer}
+---
+
+Evaluate the student's submission rigorously. Do not award high marks merely for length, file size, or keywords. Evaluate based on:
+1. Correctness: Is the solution accurate?
+2. Completeness: Did they address all parts of the prompt?
+3. Relevance: Is the answer directly addressing the task?
+4. Concept understanding: Does it display a clear conceptual grasp?
+5. Technical accuracy: Are technical descriptions, explanations, code blocks, or query details correct?
+
+Calculate a quality score (0 to 100%).
+Then calculate obtained marks = (quality_score / 100) * max_marks. (Round it to nearest integer, but keep it between 0 and max_marks).
+
+Return your evaluation ONLY in the following JSON format:
+{{
+  "quality_score": 85.0,
+  "obtained_marks": 17,
+  "feedback": "### EVALUATION REPORT\\n- **Strengths:** [Detailed points]\\n- **Improvements:** [Detailed points]\\n- **Overall Rating:** Good"
+}}
+Do NOT wrap the JSON in Markdown block quotes or include any extra text. Return ONLY the JSON object.
+"""
+
+    if gemini_key:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+            headers = {"Content-Type": "application/json"}
+            payload = {
+                "contents": [{
+                    "parts": [{
+                        "text": prompt
+                    }]
+                }],
+                "generationConfig": {
+                    "responseMimeType": "application/json"
+                }
+            }
+            req = urllib.request.Request(
+                url, 
+                data=json.dumps(payload).encode('utf-8'), 
+                headers=headers, 
+                method='POST'
+            )
+            with urllib.request.urlopen(req, timeout=15) as response:
+                res = json.loads(response.read().decode('utf-8'))
+                text = res['candidates'][0]['content']['parts'][0]['text']
+                data = json.loads(text.strip())
+                quality_score = float(data.get('quality_score', 0))
+                obtained_marks = int(round(float(data.get('obtained_marks', 0))))
+                obtained_marks = min(max_marks, max(0, obtained_marks))
+                feedback = data.get('feedback', 'Graded successfully.')
+                return quality_score, obtained_marks, feedback
+        except Exception as e:
+            print(f"[Gemini Grading Error] Fallback triggered. Error: {e}")
+
+    # Fallback Grading Logic (Rule-based)
+    student_clean = student_answer.lower()
+    instructions_words = set(re.findall(r'\w+', (task_description or "").lower()))
+    criteria_words = set(re.findall(r'\w+', (grading_criteria or "").lower()))
+    
+    stopwords = {'the', 'a', 'an', 'and', 'or', 'but', 'is', 'are', 'was', 'were', 'to', 'of', 'in', 'on', 'for', 'with', 'by', 'at', 'an', 'this', 'that', 'these', 'those'}
+    keywords = (instructions_words | criteria_words) - stopwords
+    keywords = {w for w in keywords if len(w) >= 4}
+    
+    matched_keywords = [w for w in keywords if w in student_clean]
+    match_ratio = len(matched_keywords) / len(keywords) if keywords else 0.5
+    
+    word_count = len(student_clean.split())
+    if word_count < 10:
+        length_multiplier = 0.2
+    elif word_count < 50:
+        length_multiplier = 0.6
+    elif word_count > 1000:
+        length_multiplier = 0.7
+    else:
+        length_multiplier = 1.0
+        
+    quality_score = min(100.0, max(10.0, (match_ratio * 70.0 + 30.0) * length_multiplier))
+    obtained_marks = int(round((quality_score / 100.0) * max_marks))
+    obtained_marks = min(max_marks, max(0, obtained_marks))
+    
+    feedback = f"""### AUTO-EVALUATION REPORT (Fallback Mode)
+[Warning: LLM grading key not configured or unreachable. Used localized rule-based fallback grading.]
+
+- **Content Match:** Verified presence of {len(matched_keywords)} relevant terms from instructions.
+- **Answer Length:** {word_count} words (Appropriate scale).
+- **Concept Score:** Match Ratio: {match_ratio:.2f}.
+- **Suggested Improvement:** Add more technical specifics referencing the grading criteria.
+"""
+    return quality_score, obtained_marks, feedback
+
+
+def evaluate_submission_legacy(sub):
     score = 0
     feedback_strengths = []
     feedback_improvements = []
@@ -78,8 +245,7 @@ def evaluate_submission(sub):
     doc_suggestions = []
     code_suggestions = []
     
-    # 1. Repository Validation & GitHub Url (Max 20%)
-    has_github = "github.com" in sub.github_url.lower()
+    has_github = "github.com" in sub.github_url.lower() if sub.github_url else False
     if has_github:
         score += 20
         feedback_strengths.append("Repository URL is a valid GitHub repository.")
@@ -87,8 +253,7 @@ def evaluate_submission(sub):
         score += 5
         feedback_improvements.append("Repository URL is not a standard GitHub link.")
         
-    # 2. README Quality & Documentation (Max 20%)
-    random.seed(sub.id) # Seed to keep it consistent for re-evaluation
+    random.seed(sub.id)
     readme_score = random.randint(12, 20)
     score += readme_score
     if readme_score >= 18:
@@ -101,7 +266,6 @@ def evaluate_submission(sub):
         doc_suggestions.append("Add a README.md to describe your project structure and dependencies.")
         missing_files.append("README.md")
         
-    # 3. Code Organization & Quality (Max 30%)
     code_score = random.randint(18, 30)
     score += code_score
     if code_score >= 26:
@@ -114,7 +278,6 @@ def evaluate_submission(sub):
         feedback_improvements.append("Code is contained in a single monolithic file.")
         code_suggestions.append("Refactor the codebase to separate business logic from routing/UI.")
         
-    # 4. Build or execution success & required files (Max 15%)
     build_score = random.randint(10, 15)
     score += build_score
     if build_score >= 13:
@@ -123,7 +286,6 @@ def evaluate_submission(sub):
         feedback_improvements.append("Package configuration files (.gitignore, package.json, requirements.txt) are incomplete.")
         missing_files.append(".gitignore")
         
-    # 5. Submission Before Deadline (Max 15%)
     if sub.submitted_at.date() <= sub.task.due_date:
         score += 15
         feedback_strengths.append("Submitted before the configured due date.")
@@ -131,16 +293,11 @@ def evaluate_submission(sub):
         score += 5
         feedback_improvements.append("Submitted after the due date (late submission penalty applied).")
         
-    # Ensure score is between 0 and 100
     quality_score = min(100.0, max(0.0, float(score)))
-    
-    # Calculate Obtained Marks
     max_marks = sub.task.max_marks
     obtained_marks = round((quality_score / 100.0) * max_marks)
     obtained_marks = min(max_marks, max(0, obtained_marks))
     
-    # Grade Calculation
-    # 90-100 -> A+, 80-89 -> A, 70-79 -> B, 60-69 -> C, 50-59 -> D, Below 50 -> Fail
     if quality_score >= 90:
         grade = "A+"
     elif quality_score >= 80:
@@ -154,7 +311,6 @@ def evaluate_submission(sub):
     else:
         grade = "Fail"
         
-    # Generate Feedback Text
     feedback_parts = [
         f"### AUTO-EVALUATION REPORT (Quality Score: {quality_score}%)\n",
         "**Strengths:**",
@@ -162,19 +318,49 @@ def evaluate_submission(sub):
         "\n**Areas for Improvement:**",
         "\n".join([f"- {imp}" for imp in feedback_improvements]) if feedback_improvements else "- Solid work, no major improvements needed.",
     ]
-    
     if missing_files:
         feedback_parts.append(f"\n**Missing Files:**\n" + "\n".join([f"- {f}" for f in missing_files]))
-        
     if doc_suggestions:
         feedback_parts.append(f"\n**Documentation Suggestions:**\n" + "\n".join([f"- {s}" for s in doc_suggestions]))
-        
     if code_suggestions:
         feedback_parts.append(f"\n**Code Quality Suggestions:**\n" + "\n".join([f"- {s}" for s in code_suggestions]))
         
-    feedback_text = "\n".join(feedback_parts)
+    return quality_score, obtained_marks, grade, "\n".join(feedback_parts)
+
+
+def evaluate_submission(sub):
+    if sub.submission_type == 'github':
+        return evaluate_submission_legacy(sub)
+        
+    answer_text = ""
+    if sub.submission_type == 'written':
+        answer_text = sub.written_answer or ""
+    elif sub.submission_type == 'document':
+        answer_text = sub.extracted_text or ""
+        
+    quality_score, obtained_marks, feedback = grade_content_with_llm(
+        task_title=sub.task.title,
+        task_description=sub.task.description,
+        grading_criteria=sub.task.grading_criteria,
+        expected_answer=None,
+        student_answer=answer_text,
+        max_marks=sub.task.max_marks
+    )
     
-    return quality_score, obtained_marks, grade, feedback_text
+    if quality_score >= 90:
+        grade = "A+"
+    elif quality_score >= 80:
+        grade = "A"
+    elif quality_score >= 70:
+        grade = "B"
+    elif quality_score >= 60:
+        grade = "C"
+    elif quality_score >= 50:
+        grade = "D"
+    else:
+        grade = "Fail"
+        
+    return quality_score, obtained_marks, grade, feedback
 
 def run_auto_grading_async(submission_id):
     import sys
@@ -781,20 +967,71 @@ def student_tasks(request):
 
     elif request.method == 'POST':
         task_id = request.data.get('taskId')
-        github_url = request.data.get('githubUrl')
-
-        if not task_id or not github_url:
-            return Response({'error': 'Task ID and GitHub URL are required'}, status=status.HTTP_400_BAD_REQUEST)
+        submission_type = request.data.get('submissionType')
+        legacy_github_url = request.data.get('githubUrl') or request.data.get('github_url')
+        
+        if not task_id:
+            return Response({'error': 'Task ID is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             task = Task.objects.get(id=task_id)
         except Task.DoesNotExist:
             return Response({'error': 'Task not found'}, status=status.HTTP_404_NOT_FOUND)
 
+        written_answer = None
+        uploaded_file = None
+        github_url = None
+        extracted_text = ""
+
+        # Check if githubUrl is provided in request to support legacy/tests compatibility
+        if legacy_github_url or submission_type == 'github':
+            submission_type = 'github'
+            github_url = legacy_github_url
+            if not github_url or not github_url.strip():
+                return Response({'error': 'GitHub URL is required'}, status=status.HTTP_400_BAD_REQUEST)
+        elif submission_type == 'written' or not submission_type:
+            submission_type = 'written'
+            written_answer = request.data.get('writtenAnswer')
+            if not written_answer or not written_answer.strip():
+                return Response({'error': 'Written answer cannot be empty'}, status=status.HTTP_400_BAD_REQUEST)
+            extracted_text = written_answer.strip()
+        elif submission_type == 'document':
+            uploaded_file = request.FILES.get('uploadedDocument')
+            if not uploaded_file:
+                return Response({'error': 'Document file is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # File validation
+            if uploaded_file.size > 10 * 1024 * 1024:
+                return Response({'error': 'File exceeds size limit of 10MB'}, status=status.HTTP_400_BAD_REQUEST)
+            if uploaded_file.size == 0:
+                return Response({'error': 'Uploaded file is empty'}, status=status.HTTP_400_BAD_REQUEST)
+                
+            filename = uploaded_file.name
+            _, ext = os.path.splitext(filename.lower())
+            if ext not in ['.pdf', '.docx', '.txt']:
+                return Response({'error': 'Unsupported file extension. Only PDF, DOCX, and TXT are allowed'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            mime_type = uploaded_file.content_type
+            allowed_mimes = [
+                'application/pdf',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'text/plain'
+            ]
+            if mime_type not in allowed_mimes and not (mime_type == 'application/octet-stream' and ext in ['.pdf', '.docx', '.txt']):
+                return Response({'error': f'Invalid file type: {mime_type}. Only PDF, DOCX, and TXT are allowed'}, status=status.HTTP_400_BAD_REQUEST)
+
+        else:
+            return Response({'error': 'Invalid submission type'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Get or create submission
         sub, created = Submission.objects.get_or_create(
             task=task, student=user, 
             defaults={
                 'github_url': github_url,
+                'submission_type': submission_type,
+                'written_answer': written_answer,
+                'uploaded_document': uploaded_file,
+                'extracted_text': None,
                 'evaluation_status': 'pending',
                 'grade': None,
                 'feedback': None,
@@ -805,6 +1042,10 @@ def student_tasks(request):
         )
         if not created:
             sub.github_url = github_url
+            sub.submission_type = submission_type
+            sub.written_answer = written_answer
+            sub.uploaded_document = uploaded_file
+            sub.extracted_text = None
             sub.evaluation_status = 'pending'
             sub.grade = None
             sub.feedback = None
@@ -812,6 +1053,18 @@ def student_tasks(request):
             sub.obtained_marks = None
             sub.is_approved = False
             sub.save()
+
+        # Extract text if document
+        if submission_type == 'document':
+            try:
+                sub.save()
+                file_path = sub.uploaded_document.path
+                extracted = extract_text_from_file(file_path, filename)
+                sub.extracted_text = extracted
+                sub.save()
+            except Exception as e:
+                sub.delete()
+                return Response({'error': f'Project specification could not be processed. Please upload a valid document.'}, status=status.HTTP_400_BAD_REQUEST)
 
         run_auto_grading_async(sub.id)
 
@@ -2110,6 +2363,633 @@ def admin_change_password(request):
     request.user.save()
 
     return Response({'message': 'Password changed successfully.'}, status=status.HTTP_200_OK)
+
+
+# ==========================================
+# PROJECTS MODULE EXTENSIONS
+# ==========================================
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_create_project(request):
+    try:
+        verify_admin(request.user)
+    except PermissionError as e:
+        return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
+
+    title = request.data.get('title')
+    batch_id = request.data.get('batchId')
+    maximum_marks = request.data.get('maximumMarks', 100)
+    start_date_str = request.data.get('startDate')
+    deadline_str = request.data.get('deadline')
+    additional_instructions = request.data.get('additionalInstructions', '')
+    spec_file = request.FILES.get('specification')
+
+    if not title or not batch_id or not start_date_str or not deadline_str or not spec_file:
+        return Response({'error': 'Missing required project details or specification file'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        batch = Batch.objects.get(id=batch_id)
+    except Batch.DoesNotExist:
+        return Response({'error': 'Batch not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    try:
+        maximum_marks = int(maximum_marks)
+    except ValueError:
+        return Response({'error': 'Maximum marks must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
+
+    from datetime import datetime
+    try:
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        deadline = datetime.strptime(deadline_str, "%Y-%m-%d").date()
+    except ValueError:
+        return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if spec_file.size > 10 * 1024 * 1024:
+        return Response({'error': 'Specification file exceeds size limit of 10MB'}, status=status.HTTP_400_BAD_REQUEST)
+    if spec_file.size == 0:
+        return Response({'error': 'Specification file is empty'}, status=status.HTTP_400_BAD_REQUEST)
+
+    filename = spec_file.name
+    _, ext = os.path.splitext(filename.lower())
+    if ext not in ['.pdf', '.docx', '.txt']:
+        return Response({'error': 'Unsupported specification file extension. Only PDF, DOCX, and TXT are allowed'}, status=status.HTTP_400_BAD_REQUEST)
+
+    mime_type = spec_file.content_type
+    allowed_mimes = [
+        'application/pdf',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'text/plain'
+    ]
+    if mime_type not in allowed_mimes and not (mime_type == 'application/octet-stream' and ext in ['.pdf', '.docx', '.txt']):
+        return Response({'error': f'Invalid file type: {mime_type}. Only PDF, DOCX, and TXT are allowed'}, status=status.HTTP_400_BAD_REQUEST)
+
+    proj = Project(
+        title=title,
+        assigned_batch=batch,
+        specification_file=spec_file,
+        specification_filename=filename,
+        additional_instructions=additional_instructions,
+        maximum_marks=maximum_marks,
+        start_date=start_date,
+        deadline=deadline
+    )
+    proj.save()
+
+    try:
+        file_path = proj.specification_file.path
+        extracted_text = extract_text_from_file(file_path, filename)
+        proj.specification_extracted_text = extracted_text
+        proj.save()
+    except Exception as e:
+        proj.delete()
+        return Response({'error': 'Project specification could not be processed. Please upload a valid document.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response(ProjectSerializer(proj).data)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_manage_project(request, project_id):
+    try:
+        verify_admin(request.user)
+    except PermissionError as e:
+        return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        proj = Project.objects.get(id=project_id)
+    except Project.DoesNotExist:
+        return Response({'error': 'Project not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        return Response(ProjectSerializer(proj).data)
+
+    elif request.method == 'PUT':
+        title = request.data.get('title')
+        batch_id = request.data.get('batchId')
+        maximum_marks = request.data.get('maximumMarks')
+        start_date_str = request.data.get('startDate')
+        deadline_str = request.data.get('deadline')
+        additional_instructions = request.data.get('additionalInstructions')
+        spec_file = request.FILES.get('specification')
+
+        if title:
+            proj.title = title
+        if batch_id:
+            try:
+                proj.assigned_batch = Batch.objects.get(id=batch_id)
+            except Batch.DoesNotExist:
+                return Response({'error': 'Batch not found'}, status=status.HTTP_404_NOT_FOUND)
+        if maximum_marks:
+            try:
+                proj.maximum_marks = int(maximum_marks)
+            except ValueError:
+                return Response({'error': 'Maximum marks must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        from datetime import datetime
+        if start_date_str:
+            try:
+                proj.start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+            except ValueError:
+                return Response({'error': 'Invalid start date format'}, status=status.HTTP_400_BAD_REQUEST)
+        if deadline_str:
+            try:
+                proj.deadline = datetime.strptime(deadline_str, "%Y-%m-%d").date()
+            except ValueError:
+                return Response({'error': 'Invalid deadline format'}, status=status.HTTP_400_BAD_REQUEST)
+        if additional_instructions is not None:
+            proj.additional_instructions = additional_instructions
+
+        if spec_file:
+            if spec_file.size > 10 * 1024 * 1024:
+                return Response({'error': 'Specification file exceeds size limit of 10MB'}, status=status.HTTP_400_BAD_REQUEST)
+            if spec_file.size == 0:
+                return Response({'error': 'Specification file is empty'}, status=status.HTTP_400_BAD_REQUEST)
+
+            filename = spec_file.name
+            _, ext = os.path.splitext(filename.lower())
+            if ext not in ['.pdf', '.docx', '.txt']:
+                return Response({'error': 'Unsupported file extension'}, status=status.HTTP_400_BAD_REQUEST)
+
+            mime_type = spec_file.content_type
+            allowed_mimes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain']
+            if mime_type not in allowed_mimes and not (mime_type == 'application/octet-stream' and ext in ['.pdf', '.docx', '.txt']):
+                return Response({'error': 'Invalid file MIME type'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Replace file
+            proj.specification_file = spec_file
+            proj.specification_filename = filename
+            proj.save()
+
+            try:
+                file_path = proj.specification_file.path
+                extracted_text = extract_text_from_file(file_path, filename)
+                proj.specification_extracted_text = extracted_text
+            except Exception as e:
+                return Response({'error': f'Project specification could not be processed. (Error: {str(e)})'}, status=status.HTTP_400_BAD_REQUEST)
+
+        proj.save()
+        return Response(ProjectSerializer(proj).data)
+
+    elif request.method == 'DELETE':
+        remove_spec_only = request.data.get('removeSpecOnly') or request.GET.get('removeSpecOnly')
+        if remove_spec_only == 'true' or remove_spec_only is True:
+            if proj.specification_file:
+                proj.specification_file.delete()
+            proj.specification_filename = None
+            proj.specification_extracted_text = None
+            proj.save()
+            return Response({'status': 'Specification file removed successfully', 'project': ProjectSerializer(proj).data})
+        else:
+            proj.delete()
+            return Response({'status': 'Project deleted successfully'})
+
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_get_projects(request):
+    try:
+        verify_admin(request.user)
+    except PermissionError as e:
+        return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
+    
+    from api.mongo import restore_from_mongo
+    restore_from_mongo()
+
+    projects = Project.objects.all().order_by('-deadline')
+    return Response(ProjectSerializer(projects, many=True).data)
+
+
+@api_view(['GET', 'POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def student_projects(request):
+    from api.mongo import restore_from_mongo
+    restore_from_mongo()
+
+    user = request.user
+    batch = get_student_batch(user)
+
+    if request.method == 'GET':
+        projects = Project.objects.filter(assigned_batch=batch).order_by('-deadline') if batch else Project.objects.none()
+        
+        serialized_projects = []
+        for p in projects:
+            sub = ProjectSubmission.objects.filter(project=p, student=user).first()
+            serialized_projects.append({
+                'id': p.id,
+                'title': p.title,
+                'assigned_batch': p.assigned_batch_id,
+                'specification_file': p.specification_file.url if p.specification_file else None,
+                'specification_filename': p.specification_filename,
+                'additional_instructions': p.additional_instructions,
+                'maximum_marks': p.maximum_marks,
+                'start_date': str(p.start_date),
+                'deadline': str(p.deadline),
+                'submission': ProjectSubmissionSerializer(sub).data if sub else None
+            })
+        return Response(serialized_projects)
+
+    elif request.method == 'POST':
+        project_id = request.data.get('projectId')
+        github_url = request.data.get('githubUrl')
+        deployment_url = request.data.get('deploymentUrl', '')
+
+        if not project_id or not github_url:
+            return Response({'error': 'Project ID and GitHub URL are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            project = Project.objects.get(id=project_id)
+        except Project.DoesNotExist:
+            return Response({'error': 'Project not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        import re
+        if not re.match(r'^https?://(?:www\.)?github\.com/[^/]+/[^/]+/?$', github_url.strip()):
+            return Response({'error': 'Please provide a valid GitHub repository URL (e.g. https://github.com/username/project)'}, status=status.HTTP_400_BAD_REQUEST)
+
+        sub, created = ProjectSubmission.objects.get_or_create(
+            project=project, student=user,
+            defaults={
+                'github_url': github_url,
+                'deployment_url': deployment_url,
+                'status': 'pending',
+                'project_match_score': None,
+                'quality_score': None,
+                'obtained_marks': None,
+                'evaluation_report': None,
+                'admin_feedback': None
+            }
+        )
+        if not created:
+            sub.github_url = github_url
+            sub.deployment_url = deployment_url
+            sub.status = 'pending'
+            sub.project_match_score = None
+            sub.quality_score = None
+            sub.obtained_marks = None
+            sub.evaluation_report = None
+            sub.admin_feedback = None
+            sub.save()
+
+        run_project_auto_grading_async(sub.id)
+
+        return Response(ProjectSubmissionSerializer(sub).data)
+
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_get_project_submissions(request):
+    try:
+        verify_admin(request.user)
+    except PermissionError as e:
+        return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
+
+    from api.mongo import restore_from_mongo
+    restore_from_mongo()
+
+    subs = ProjectSubmission.objects.all().order_by('-submitted_at')
+    return Response(ProjectSubmissionSerializer(subs, many=True).data)
+
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_grade_project_submission(request):
+    try:
+        verify_admin(request.user)
+    except PermissionError as e:
+        return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
+
+    sub_id = request.data.get('submissionId')
+    action = request.data.get('action')
+
+    if not sub_id:
+        return Response({'error': 'Submission ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        sub = ProjectSubmission.objects.get(id=sub_id)
+    except ProjectSubmission.DoesNotExist:
+        return Response({'error': 'Submission not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    from django.utils import timezone
+    if action == 'approve':
+        sub.status = 'admin-approved'
+        sub.graded_at = timezone.now()
+        sub.save()
+        return Response({'status': 'Marks approved successfully', 'submission': ProjectSubmissionSerializer(sub).data})
+
+    elif action == 'override':
+        obtained_marks = request.data.get('obtainedMarks')
+        feedback = request.data.get('feedback', '')
+
+        if obtained_marks is None:
+            return Response({'error': 'Obtained marks are required for override'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            obtained_marks = float(obtained_marks)
+        except ValueError:
+            return Response({'error': 'Obtained marks must be a number'}, status=status.HTTP_400_BAD_REQUEST)
+
+        max_marks = float(sub.project.maximum_marks)
+        if obtained_marks > max_marks or obtained_marks < 0:
+            return Response({'error': f'Obtained marks must be between 0 and {max_marks}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        sub.obtained_marks = obtained_marks
+        sub.quality_score = round((obtained_marks / max_marks) * 100.0, 2)
+        sub.admin_feedback = feedback
+        sub.status = 'admin-overridden'
+        sub.graded_at = timezone.now()
+        sub.save()
+        return Response({'status': 'Marks overridden successfully', 'submission': ProjectSubmissionSerializer(sub).data})
+
+    elif action == 'reevaluate':
+        sub.status = 'pending'
+        sub.project_match_score = None
+        sub.quality_score = None
+        sub.obtained_marks = None
+        sub.evaluation_report = None
+        sub.admin_feedback = None
+        sub.save()
+
+        run_project_auto_grading_async(sub.id)
+        return Response({'status': 'Re-evaluation started', 'submission': ProjectSubmissionSerializer(sub).data})
+
+    else:
+        return Response({'error': 'Invalid action'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+def evaluate_project_submission_logic(sub):
+    from django.utils import timezone
+    import re
+    import os
+    import json
+    import urllib.request
+
+    url = sub.github_url.strip()
+    match = re.match(r'^https?://(?:www\.)?github\.com/([^/]+)/([^/]+)/?$', url)
+    if not match:
+        sub.status = 'review_required'
+        sub.project_match_score = 0
+        sub.quality_score = 0
+        sub.obtained_marks = 0
+        sub.evaluation_report = "### EVALUATION ERROR\n\nThe provided URL is not a valid GitHub repository URL. It must look like `https://github.com/username/repository-name`."
+        sub.graded_at = timezone.now()
+        sub.save()
+        return
+
+    owner = match.group(1)
+    repo = match.group(2)
+    if repo.endswith('.git'):
+        repo = repo[:-4]
+
+    token = os.getenv('GITHUB_TOKEN')
+    
+    repo_api_url = f"https://api.github.com/repos/{owner}/{repo}"
+    repo_data, status_code = fetch_github_api(repo_api_url, token)
+    
+    if status_code == 404:
+        sub.status = 'review_required'
+        sub.project_match_score = 0
+        sub.quality_score = 0
+        sub.obtained_marks = 0
+        sub.evaluation_report = "### EVALUATION ERROR\n\nGitHub repository not found. Please verify that the repository is public and the URL is spelled correctly."
+        sub.graded_at = timezone.now()
+        sub.save()
+        return
+    elif status_code == 403 or repo_data is None:
+        sub.status = 'review_required'
+        sub.project_match_score = 0
+        sub.quality_score = 0
+        sub.obtained_marks = 0
+        sub.evaluation_report = f"### EVALUATION ERROR\n\nGitHub API rate limit exceeded or repository is inaccessible (HTTP {status_code}). Requires Admin review."
+        sub.graded_at = timezone.now()
+        sub.save()
+        return
+
+    default_branch = repo_data.get('default_branch', 'main')
+
+    tree_api_url = f"https://api.github.com/repos/{owner}/{repo}/git/trees/{default_branch}?recursive=1"
+    tree_data, tree_status = fetch_github_api(tree_api_url, token)
+    
+    file_list = []
+    has_readme = False
+    has_package_json = False
+    has_requirements_txt = False
+    readme_path = None
+    package_json_path = None
+    requirements_path = None
+
+    if tree_status == 200 and tree_data and 'tree' in tree_data:
+        for node in tree_data['tree']:
+            path = node.get('path', '')
+            if node.get('type') == 'blob':
+                file_list.append(path)
+                lower_path = path.lower()
+                if lower_path == 'readme.md':
+                    has_readme = True
+                    readme_path = path
+                elif lower_path == 'package.json':
+                    has_package_json = True
+                    package_json_path = path
+                elif lower_path == 'requirements.txt':
+                    has_requirements_txt = True
+                    requirements_path = path
+    
+    file_list_summary = file_list[:150]
+    if len(file_list) > 150:
+        file_list_summary.append(f"... and {len(file_list) - 150} more files.")
+
+    readme_content = ""
+    package_json_content = ""
+    requirements_content = ""
+
+    if has_readme and readme_path:
+        readme_content = fetch_raw_github_file(owner, repo, default_branch, readme_path)[:4000]
+    if has_package_json and package_json_path:
+        package_json_content = fetch_raw_github_file(owner, repo, default_branch, package_json_path)[:2000]
+    if has_requirements_txt and requirements_path:
+        requirements_content = fetch_raw_github_file(owner, repo, default_branch, requirements_path)[:2000]
+
+    deployment_info = "Not provided"
+    if sub.deployment_url:
+        deployment_info = f"URL: {sub.deployment_url}\n"
+        try:
+            req = urllib.request.Request(sub.deployment_url, headers={'User-Agent': 'CSMS-Grading-Agent'})
+            with urllib.request.urlopen(req, timeout=5) as response:
+                if response.getcode() == 200:
+                    deployment_info += "Status: Reachable (HTTP 200)"
+                else:
+                    deployment_info += f"Status: Unreachable (HTTP {response.getcode()})"
+        except Exception as e:
+            deployment_info += f"Status: Unreachable ({str(e)})"
+
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    if not gemini_key:
+        from django.conf import settings
+        gemini_key = getattr(settings, 'GEMINI_API_KEY', None)
+
+    prompt = f"""You are a strict, professional code evaluator. Your task is to evaluate the student's GitHub repository submission against the assigned project specification.
+
+Assigned Project: {sub.project.title}
+Additional Instructions: {sub.project.additional_instructions or "None"}
+Specification Document:
+---
+{sub.project.specification_extracted_text or "No specification extracted."}
+---
+
+Student Submitted GitHub Repository: {sub.github_url}
+Deployment Information:
+{deployment_info}
+
+Scanned File List (first 150 files):
+{json.dumps(file_list_summary, indent=2)}
+
+README Contents:
+---
+{readme_content or "No README found."}
+---
+
+package.json / requirements.txt Contents:
+{package_json_content or requirements_content or "No packages config found."}
+
+Please run a rigorous static code review.
+Rules:
+1. Determine "project_match_score" (0 to 100%): Does the repository actually represent the assigned project '{sub.project.title}'? If it is a completely different project (even if it has good code), the match score must be VERY LOW (e.g. < 20%) and they must receive very low marks.
+2. Search for real implementation evidence (components, models, endpoints, views, routing configurations) rather than just README claims. If there's no actual implementation, score should be low.
+3. Identify the requirements from the Project Specification (e.g., authentication, database integration, specific views, business logic). Check if each requirement is implemented, missing, or partially implemented.
+4. Calculate the "quality_score" (0 to 100%). If the specification has a rubric, follow that rubric. Otherwise, use:
+   - Project Match / Relevance: 25%
+   - Required Features: 30%
+   - Functionality: 15%
+   - Code Quality & Architecture: 10%
+   - Backend / Database Integration: 10%
+   - Documentation: 5%
+   - Repository Quality: 5%
+5. Calculate obtained marks = (quality_score / 100.0) * {sub.project.maximum_marks}. Round to one decimal place.
+6. Determine the final "status". If:
+   - Repository is inaccessible, empty, has almost no code, or has a Project Match Score < 50%
+   Then status MUST be "review_required" (Requires Admin Review).
+   Otherwise status should be "auto-graded".
+
+You must respond ONLY with a JSON object in this format (no markdown blocks, no prefix):
+{{
+  "project_match_score": 92.0,
+  "quality_score": 82.0,
+  "obtained_marks": 41.0,
+  "status": "auto-graded",
+  "evaluation_report": "### PROJECT EVALUATION REPORT\\n\\n[Detailed report text with markdown structure, checklist of requirements, tech stack detected, code quality analysis, deployment status, and feedback]"
+}}
+"""
+
+    if gemini_key:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+            headers = {"Content-Type": "application/json"}
+            payload = {
+                "contents": [{
+                    "parts": [{
+                        "text": prompt
+                    }]
+                }],
+                "generationConfig": {
+                    "responseMimeType": "application/json"
+                }
+            }
+            req = urllib.request.Request(
+                url, 
+                data=json.dumps(payload).encode('utf-8'), 
+                headers=headers, 
+                method='POST'
+            )
+            with urllib.request.urlopen(req, timeout=25) as response:
+                res = json.loads(response.read().decode('utf-8'))
+                text = res['candidates'][0]['content']['parts'][0]['text']
+                data = json.loads(text.strip())
+                
+                sub.project_match_score = float(data.get('project_match_score', 0))
+                sub.quality_score = float(data.get('quality_score', 0))
+                sub.obtained_marks = round(float(data.get('obtained_marks', 0)), 1)
+                sub.obtained_marks = min(float(sub.project.maximum_marks), max(0.0, sub.obtained_marks))
+                sub.status = data.get('status', 'auto-graded')
+                sub.evaluation_report = data.get('evaluation_report', 'Graded successfully.')
+                sub.graded_at = timezone.now()
+                sub.save()
+                return
+        except Exception as e:
+            print(f"[Gemini Project Grading Error] Triggering fallback. Error: {e}")
+
+    # Fallback Grading
+    title_words = [w.lower() for w in re.findall(r'\w+', sub.project.title) if len(w) >= 4]
+    found_count = 0
+    search_space = (readme_content + " ".join(file_list_summary)).lower()
+    for w in title_words:
+        if w in search_space:
+            found_count += 1
+    match_score = (found_count / len(title_words)) * 100.0 if title_words else 80.0
+    
+    quality = 30.0
+    reasons = []
+    if has_readme:
+        quality += 20.0
+        reasons.append("README is present.")
+    if has_package_json or has_requirements_txt:
+        quality += 20.0
+        reasons.append("Project configuration package definitions detected.")
+    if len(file_list) > 10:
+        quality += 20.0
+        reasons.append("Adequate source files present.")
+    if sub.deployment_url:
+        quality += 10.0
+        reasons.append("Deployment URL provided.")
+
+    if match_score < 40.0:
+        status = 'review_required'
+        report_warning = "\n\n**WARNING:** The repository search terms match very poorly with the project title. Requires Admin review."
+    else:
+        status = 'auto-graded'
+        report_warning = ""
+
+    sub.project_match_score = round(match_score, 1)
+    sub.quality_score = round(quality, 1)
+    sub.obtained_marks = round((quality / 100.0) * sub.project.maximum_marks, 1)
+    sub.status = status
+    sub.evaluation_report = f"""### PROJECT EVALUATION REPORT (Fallback Mode)
+[Warning: LLM grading key not configured or unreachable. Used localized rule-based fallback grading.]
+
+- **Project Match Score:** {match_score:.1f}%{report_warning}
+- **Tech Stack Indicators:** {", ".join(reasons) if reasons else "None found"}
+- **File count:** {len(file_list)} files scanned.
+- **Deployment URL status:** {deployment_info}
+"""
+    sub.graded_at = timezone.now()
+    sub.save()
+
+
+def run_project_auto_grading_async(submission_id):
+    import sys
+    if 'test' in sys.argv:
+        return
+    
+    def worker():
+        import time
+        time.sleep(2)
+        try:
+            from api.models import ProjectSubmission
+            sub = ProjectSubmission.objects.get(id=submission_id)
+            sub.status = 'grading'
+            sub.save()
+            
+            time.sleep(3)
+            evaluate_project_submission_logic(sub)
+        except Exception as e:
+            print(f"[Project Auto-Grading Error] Async worker error: {e}")
+            
+    import threading
+    threading.Thread(target=worker).start()
 
 
 

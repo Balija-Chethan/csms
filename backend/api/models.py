@@ -71,7 +71,11 @@ class Task(models.Model):
 class Submission(models.Model):
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='submissions')
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='submissions')
-    github_url = models.URLField()
+    github_url = models.URLField(blank=True, null=True)
+    submission_type = models.CharField(max_length=20, default='written', choices=[('github', 'GitHub Link'), ('written', 'Written Answer'), ('document', 'Document Upload')])
+    written_answer = models.TextField(blank=True, null=True)
+    uploaded_document = models.FileField(upload_to='task_documents/', blank=True, null=True)
+    extracted_text = models.TextField(blank=True, null=True)
     grade = models.CharField(max_length=10, blank=True, null=True, help_text="e.g. 5/5, 10/10, etc.")
     feedback = models.TextField(blank=True, null=True)
     quality_score = models.FloatField(blank=True, null=True)
@@ -255,3 +259,49 @@ class PasswordResetOTP(models.Model):
 
     def __str__(self):
         return f"{self.email} - {self.expires_at}"
+
+
+class Project(models.Model):
+    title = models.CharField(max_length=200)
+    assigned_batch = models.ForeignKey(Batch, on_delete=models.CASCADE, related_name='projects')
+    specification_file = models.FileField(upload_to='project_specifications/', blank=True, null=True)
+    specification_filename = models.CharField(max_length=255, blank=True, null=True)
+    specification_extracted_text = models.TextField(blank=True, null=True)
+    additional_instructions = models.TextField(blank=True, null=True)
+    maximum_marks = models.IntegerField(default=100)
+    start_date = models.DateField()
+    deadline = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.title} ({self.assigned_batch.name})"
+
+
+class ProjectSubmission(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('grading', 'Auto Grading...'),
+        ('auto-graded', 'Auto-Graded'),
+        ('admin-approved', 'Admin-Approved'),
+        ('admin-overridden', 'Admin-Overridden'),
+        ('review_required', 'Requires Admin Review'),
+    ]
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='project_submissions')
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='submissions')
+    github_url = models.URLField()
+    deployment_url = models.URLField(blank=True, null=True)
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    project_match_score = models.FloatField(blank=True, null=True)
+    quality_score = models.FloatField(blank=True, null=True)
+    obtained_marks = models.FloatField(blank=True, null=True)
+    evaluation_report = models.TextField(blank=True, null=True)
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='pending')
+    admin_feedback = models.TextField(blank=True, null=True)
+    graded_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        unique_together = ('project', 'student')
+
+    def __str__(self):
+        return f"{self.student.username} - {self.project.title} ({self.status})"
