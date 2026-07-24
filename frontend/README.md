@@ -1,16 +1,32 @@
-# React + Vite
+# CSMS - Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+This is the React + Vite frontend application for the **CSMS** (Cheta Students Management System).
 
-Currently, two official plugins are available:
+For complete documentation on the features, tech stack, backend, database integration, and deployment, please refer to the main [Root README](../README.md).
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🛠️ Tech Stack & Features
+- **Core**: React, Vite
+- **Styling**: Custom CSS & Glassmorphism design system
+- **Icons**: Lucide React
+- **Features**: Dashboards, LeetCode sync, Grades, Leaderboard, Attendance tracking, leaves application, real-time peer chat, and comprehensive admin controls.
 
-## React Compiler
+## 👥 FrontEnd Contributions
+- **B. Chethan** (Roll No: 23691A0532) - FrontEnd Developer
+  - *Contribution*: Designed and implemented the user dashboards, chat views, leaderboard, task evaluation interfaces, and customized visual elements.
+- **Nichitha Sree** (Roll No: 23691A03340) - Testing + Documentation
+  - *Contribution*: Tested interactive frontend components, resolved navigation glitches, and documented visual workflows.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## 🚀 Setup Instructions
+1. Ensure Node.js is installed.
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Run the application locally in development mode:
+   ```bash
+   npm run dev
+   ```
+4. Build the application for production:
+   ```bash
+   npm run build
+   ```

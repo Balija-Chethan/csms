@@ -9,18 +9,24 @@ const GithubIcon = ({ size }) => (
 
 export default function FloatingTechBackground() {
   const items = [
-    { type: 'icon', element: Code2, size: 24, top: '15%', left: '10%', color: '#60a5fa', delay: '0s', duration: '14s', anim: 'float-pattern-1', mobile: true },
-    { type: 'icon', element: Database, size: 22, top: '25%', left: '80%', color: '#34d399', delay: '-3s', duration: '16s', anim: 'float-pattern-2', mobile: true },
-    { type: 'text', element: '{}', size: 20, top: '40%', left: '20%', color: '#a855f7', delay: '-1s', duration: '12s', anim: 'float-pattern-3', mobile: false },
-    { type: 'icon', element: GithubIcon, size: 22, top: '55%', left: '85%', color: '#9ca3af', delay: '-5s', duration: '18s', anim: 'float-pattern-4', mobile: true },
-    { type: 'text', element: '>_', size: 18, top: '70%', left: '15%', color: '#eab308', delay: '-2s', duration: '15s', anim: 'float-pattern-1', mobile: false },
-    { type: 'icon', element: Terminal, size: 20, top: '80%', left: '70%', color: '#3b82f6', delay: '-7s', duration: '20s', anim: 'float-pattern-2', mobile: true },
-    { type: 'text', element: '[]', size: 18, top: '10%', left: '75%', color: '#60a5fa', delay: '-4s', duration: '13s', anim: 'float-pattern-3', mobile: false },
-    { type: 'icon', element: Cpu, size: 24, top: '45%', left: '90%', color: '#f43f5e', delay: '-6s', duration: '17s', anim: 'float-pattern-4', mobile: false },
-    { type: 'text', element: '</>', size: 22, top: '85%', left: '40%', color: '#10b981', delay: '-1.5s', duration: '14s', anim: 'float-pattern-1', mobile: true },
-    { type: 'icon', element: GitBranch, size: 20, top: '30%', left: '5%', color: '#fb923c', delay: '-8s', duration: '19s', anim: 'float-pattern-2', mobile: false },
-    { type: 'icon', element: Binary, size: 20, top: '65%', left: '30%', color: '#a855f7', delay: '-3.5s', duration: '16s', anim: 'float-pattern-3', mobile: false },
-    { type: 'text', element: 'python', size: 16, top: '50%', left: '60%', color: '#60a5fa', delay: '-2.5s', duration: '15s', anim: 'float-pattern-4', mobile: false }
+    // 5 Mobile visible (will also be visible on Tablet and Desktop)
+    { type: 'icon', element: Code2, size: 24, top: '15%', left: '10%', color: '#60a5fa', delay: '0s', duration: '14s', anim: 'float-pattern-1', visibility: 'mobile' },
+    { type: 'icon', element: Database, size: 22, top: '25%', left: '80%', color: '#34d399', delay: '-3s', duration: '16s', anim: 'float-pattern-2', visibility: 'mobile' },
+    { type: 'icon', element: GithubIcon, size: 22, top: '55%', left: '85%', color: '#9ca3af', delay: '-5s', duration: '18s', anim: 'float-pattern-4', visibility: 'mobile' },
+    { type: 'icon', element: Terminal, size: 20, top: '80%', left: '70%', color: '#3b82f6', delay: '-7s', duration: '20s', anim: 'float-pattern-2', visibility: 'mobile' },
+    { type: 'text', element: '</>', size: 22, top: '85%', left: '40%', color: '#10b981', delay: '-1.5s', duration: '14s', anim: 'float-pattern-1', visibility: 'mobile' },
+
+    // 4 Tablet visible (visible on Tablet and Desktop, hidden on Mobile)
+    { type: 'text', element: '{}', size: 20, top: '40%', left: '20%', color: '#a855f7', delay: '-1s', duration: '12s', anim: 'float-pattern-3', visibility: 'tablet' },
+    { type: 'text', element: '>_', size: 18, top: '70%', left: '15%', color: '#eab308', delay: '-2s', duration: '15s', anim: 'float-pattern-1', visibility: 'tablet' },
+    { type: 'text', element: '[]', size: 18, top: '10%', left: '75%', color: '#60a5fa', delay: '-4s', duration: '13s', anim: 'float-pattern-3', visibility: 'tablet' },
+    { type: 'text', element: 'python', size: 16, top: '50%', left: '60%', color: '#60a5fa', delay: '-2.5s', duration: '15s', anim: 'float-pattern-4', visibility: 'tablet' },
+
+    // 4 Desktop visible (visible on Desktop only, hidden on Mobile and Tablet)
+    { type: 'icon', element: Cpu, size: 24, top: '45%', left: '90%', color: '#f43f5e', delay: '-6s', duration: '17s', anim: 'float-pattern-4', visibility: 'desktop' },
+    { type: 'icon', element: GitBranch, size: 20, top: '30%', left: '5%', color: '#fb923c', delay: '-8s', duration: '19s', anim: 'float-pattern-2', visibility: 'desktop' },
+    { type: 'icon', element: Binary, size: 20, top: '65%', left: '30%', color: '#a855f7', delay: '-3.5s', duration: '16s', anim: 'float-pattern-3', visibility: 'desktop' },
+    { type: 'text', element: 'java', size: 16, top: '20%', left: '45%', color: '#fb923c', delay: '-4.5s', duration: '18s', anim: 'float-pattern-1', visibility: 'desktop' }
   ];
 
   return (
@@ -40,7 +46,7 @@ export default function FloatingTechBackground() {
 
         .floating-tech-element {
           position: absolute;
-          opacity: 0.05;
+          opacity: 0.1;
           will-change: transform;
           display: flex;
           align-items: center;
@@ -79,8 +85,14 @@ export default function FloatingTechBackground() {
           }
         }
 
-        @media (max-width: 768px) {
-          .desktop-only-element {
+        @media (max-width: 480px) {
+          .tablet-visible, .desktop-visible {
+            display: none !important;
+          }
+        }
+
+        @media (min-width: 481px) and (max-width: 1024px) {
+          .desktop-visible {
             display: none !important;
           }
         }
@@ -88,7 +100,7 @@ export default function FloatingTechBackground() {
       <div className="floating-tech-bg-container" aria-hidden="true">
         {items.map((item, idx) => {
           const IconComponent = item.type === 'icon' ? item.element : null;
-          const classNames = `floating-tech-element ${item.mobile ? '' : 'desktop-only-element'}`;
+          const classNames = `floating-tech-element ${item.visibility}-visible`;
           
           return (
             <div

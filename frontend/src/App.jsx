@@ -179,7 +179,7 @@ export default function App() {
   if (loading && !dashboardData) {
     return (
       <div style={{ display: 'flex', height: '100vh', width: '100vw', alignItems: 'center', justifyContent: 'center', background: '#0b0f19', color: '#fff', flexDirection: 'column', gap: 20 }}>
-        <img src="/logo.jpg" alt="CSMS Logo" style={{ height: 80, width: 'auto', borderRadius: 12, objectFit: 'contain' }} />
+        <img src="/logo.png" alt="CSMS Logo" style={{ height: 80, width: 'auto', borderRadius: 12, objectFit: 'contain' }} />
         <h2 style={{ fontSize: 20, fontFamily: 'var(--font-header)' }}>Loading CSMS Portal...</h2>
       </div>
     );
@@ -188,7 +188,7 @@ export default function App() {
   if (user.role !== 'admin' && enrollmentStatus === null) {
     return (
       <div style={{ display: 'flex', height: '100vh', width: '100vw', alignItems: 'center', justifyContent: 'center', background: '#0b0f19', color: '#fff', flexDirection: 'column', gap: 20 }}>
-        <img src="/logo.jpg" alt="CSMS Logo" style={{ height: 80, width: 'auto', borderRadius: 12, objectFit: 'contain' }} />
+        <img src="/logo.png" alt="CSMS Logo" style={{ height: 80, width: 'auto', borderRadius: 12, objectFit: 'contain' }} />
         <h2 style={{ fontSize: 20, fontFamily: 'var(--font-header)' }}>Loading CSMS Portal...</h2>
       </div>
     );
@@ -236,7 +236,7 @@ export default function App() {
             >
               <Menu size={24} />
             </button>
-            <img src="/logo.jpg" alt="CSMS Logo" style={{ height: 40, width: 'auto', borderRadius: 6, objectFit: 'contain' }} />
+            <img src="/logo.png" alt="CSMS Logo" style={{ height: 40, width: 'auto', borderRadius: 6, objectFit: 'contain' }} />
             <div style={styles.logo}>CSMS</div>
           </div>
         </div>
@@ -287,7 +287,7 @@ export default function App() {
         {/* Sidebar Panel */}
         <aside className={`app-sidebar ${sidebarOpen ? 'open' : ''}`} style={styles.sidebar}>
           <div style={styles.sidebarBrand}>
-            <img src="/logo.jpg" alt="CSMS Logo" style={styles.sidebarLogo} />
+            <img src="/logo.png" alt="CSMS Logo" style={styles.sidebarLogo} />
             <span style={styles.sidebarBrandText}>CSMS</span>
           </div>
           <nav style={styles.nav}>
